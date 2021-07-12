@@ -13,6 +13,7 @@ get-task-validator = func(task)
 	- date/time (begin, end) : optional
 
 	- id : int ==> auto generated
+	- version: string ==> auto generated
 	*/
 	func()
 		schema = list('map' map(
@@ -58,14 +59,6 @@ end
 get-query-func = func(query-map)
 	import stdfu
 
-	/*
-	map(
-		'tags'  list('t1', 't2', 't3')
-		'state' list('new')
-		'name'  list('A', 'B')
-	)
-	*/
-
 	has-tags tag-list = getl(query-map 'tags'):
 	has-state state-list = getl(query-map 'state'):
 	has-name name-list = getl(query-map 'name'):
@@ -95,7 +88,6 @@ get-query-func = func(query-map)
 	end
 
 	func(task)
-		#_ = print('task: ' task)
 		and(
 			call(qcheck task 'tags' has-tags tag-list true)
 			call(qcheck task 'state' has-state state-list false)
@@ -114,7 +106,7 @@ interleave-fields = func(old-item new-item)
 	call(stdfu.merge conflict-solver old-item new-item)
 end
 
-#=====================
+#===================== tests ====
 
 test-interl = proc()
 	mold = map('a' 1 'b' 2)
@@ -122,12 +114,6 @@ test-interl = proc()
 
 	call(interleave-fields mold mnew)
 end
-
-# ../funla -eval "call(func(x) plus('v' str(plus(conv(slice(x 1) 'int') 1))) end 'v658')"
-# 'v659'
-
-# ../funla -eval "call(func(x) import stdstr and(call(stdstr.is-digit slice(x 1)) call(stdstr.startswith x 'v')) end 'v4561')"
-# true
 
 test-q-all = proc()
 	import stdfu
