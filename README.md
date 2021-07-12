@@ -33,22 +33,23 @@ And start the server:
 
 ```
 ./todoapp
-...serving...
+todoapp: 2021/07/12 15:30:06 :'...serving...'
 ```
 
 or in Windows:
 
 ```
 todoapp.exe
-...serving...
+todoapp: 2021/07/12 15:32:48 :'...serving...'
 ```
 
 And shutting down is done by CTRL-C (SIGINT):
 
 ```
 ...serving...
-signal received: 2interrupt
-listen: http: Server closed
+todoapp: 2021/07/12 15:32:48 :'...serving...'
+todoapp: 2021/07/12 15:33:22 :'signal received: ':2:'interrupt'
+todoapp: 2021/07/12 15:33:22 :'listen: ':'http: Server closed'
 Result is 'done'
 ```
 
@@ -332,6 +333,27 @@ curl 'http://localhost:8003/todoapp/v1/tasks?tags=yard,car&state=new&name=lawn%2
 	"name": "lawn mowing",
 	"version": "v1"
 }]
+```
+
+## Port number
+
+By default **todoapp** is using port number **8003**.
+Port number can be defined to be something else by setting
+**TODOAPP_PORT** environment variable:
+
+Example:
+
+```
+export TODOAPP_PORT=9001
+
+$ ./todoapp
+todoapp: 2021/07/12 16:13:21 :'...serving...'
+
+curl http://localhost:8003/todoapp/v1/tasks
+localhost port 8003: Connection refused
+
+curl http://localhost:9001/todoapp/v1/tasks
+[{"id": 11, "description": "", "name": "A", "tags": [], "state": "new", "version": "v1"}, {"id": 12, "description": "", "name": "B", "tags": [], "state": "new", "version": "v1"}]
 ```
 
 ## Implementation
