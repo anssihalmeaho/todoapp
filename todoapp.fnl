@@ -8,25 +8,28 @@ import stdbytes
 import stddbc
 import stdfu
 import stdpr
+import stdlog
 
 import valuez
 
 import domain
 
-# https://www.smashingmagazine.com/2018/01/understanding-using-rest-api/
-# https://restfulapi.net/resource-naming/
-# https://www.kennethlange.com/avoid-data-corruption-in-your-rest-api-with-etags/
+# HTTP status codes
+Status-OK          = 200 # OK HTTP status code
+Status-Created     = 201 # Created HTTP status code
+Status-Bad-Request = 400 # Bad Request HTTP status code
 
-/*
- - logging
- - http-status code symbols
- - port as env.var
-*/
+# logger to use in this server
+log = call(stdlog.get-default-logger map('prefix' 'todoapp: ' 'date' true 'time' true))
 
 # set debug print functions
 is-debug-on = false
 debug = call(stdpr.get-pr is-debug-on)
 debugpp = call(stdpr.get-pp-pr is-debug-on)
+
+put-error = proc(w status-code text)
+	call(stdhttp.write-response w status-code call(stdbytes.str-to-bytes text))
+end
 
 create-get-item-with-id = func(col)
 	proc(w r params)
@@ -35,7 +38,7 @@ create-get-item-with-id = func(col)
 
 		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
 		_ _ response = call(stdjson.encode matched-items):
-		call(stdhttp.write-response w 200 response)
+		call(stdhttp.write-response w Status-OK response)
 	end
 end
 
@@ -70,7 +73,7 @@ create-get-all-matching-items = func(col)
 
 		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
 		_ _ response = call(stdjson.encode all-items):
-		call(stdhttp.write-response w 200 response)
+		call(stdhttp.write-response w Status-OK response)
 
 		end)))
 	end
@@ -113,100 +116,118 @@ end
 create-modify-item = func(col)
 	proc(w r params)
 		selected-id = conv(get(params ':id') 'int')
-		_ _ new-item-1 = call(stdjson.decode get(r 'body')):
+		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
 
-		has-version version = getl(new-item-1 'version'):
-		check-ok err-text = call(is-valid-version has-version version):
-
-		new-item = if( and(has-version check-ok)
-			put(del(new-item-1 'version') 'version' call(generate-new-version version))
-			new-item-1
-		)
-
-		# following part is same as in replace (duplicate code)
-		all-ok err-descr = if( check-ok
+		if( decode-ok
 			call(proc()
-				id-matcher = call(domain.task-id-match selected-id)
+				has-version version = getl(new-item-1 'version'):
+				check-ok err-text = call(is-valid-version has-version version):
 
-				upd-func = func(x)
-					if( call(id-matcher x)
-						if( eq(get(x 'version') version)
-							call(func()
-								modified-item = call(domain.interleave-fields x new-item)
-								list(true modified-item)
-							end)
-							list(false 'none')
+				new-item = if( and(has-version check-ok)
+					put(del(new-item-1 'version') 'version' call(generate-new-version version))
+					new-item-1
+				)
+
+				# following part is same as in replace (duplicate code)
+				all-ok err-descr = if( check-ok
+					call(proc()
+						id-matcher = call(domain.task-id-match selected-id)
+
+						upd-func = func(x)
+							if( call(id-matcher x)
+								if( eq(get(x 'version') version)
+									call(func()
+										modified-item = call(domain.interleave-fields x new-item)
+										list(true modified-item)
+									end)
+									list(false 'none')
+								)
+								list(false 'none')
+							)
+						end
+
+						was-any-updated = call(valuez.update col upd-func)
+						if( was-any-updated
+							list(true '')
+							list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
 						)
-						list(false 'none')
-					)
-				end
+					end)
 
-				was-any-updated = call(valuez.update col upd-func)
-				if( was-any-updated
-					list(true '')
-					list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
+					list(false err-text)
+				):
+
+				if( not(all-ok)
+					call(put-error w Status-Bad-Request str(err-descr))
+					'success'
 				)
 			end)
 
-			list(false err-text)
-		):
-
-		if( not(all-ok)
-			call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes str(err-descr)))
-			'success'
+			call(proc()
+				_ = call(log 'error in decoding: ' decode-err)
+				call(put-error w Status-Bad-Request 'invalid request body')
+			end)
 		)
+
 	end
 end
 
 create-replace-item = func(col)
 	proc(w r params)
 		selected-id = conv(get(params ':id') 'int')
-
-		_ _ new-item-1 = call(stdjson.decode get(r 'body')):
-		has-id idvalue = getl(new-item-1 'id'):
-
-		has-version version = getl(new-item-1 'version'):
-		is-valid-vers vers-err = call(is-valid-version has-version version):
-
-		new-item = if( and(has-version is-valid-vers)
-			put(del(new-item-1 'version') 'version' call(generate-new-version version))
-			new-item-1
-		)
-
-		check-ok err-text = cond(
-			not(has-id)                  list(false sprintf('id not found in task (%d)' selected-id))
-			not(eq(idvalue selected-id)) list(false sprintf('assuming same ids (%d <-> %d)' selected-id idvalue))
-			not(is-valid-vers)           list(false vers-err)
-			call(call(domain.get-task-validator new-item))
-		):
-
-		all-ok err-descr = if( check-ok
+		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
+		if( decode-ok
 			call(proc()
-				id-matcher = call(domain.task-id-match selected-id)
+				has-id idvalue = getl(new-item-1 'id'):
 
-				upd-func = func(x)
-					if( call(id-matcher x)
-						if( eq(get(x 'version') version)
-							list(true new-item)
-							list(false 'none')
+				has-version version = getl(new-item-1 'version'):
+				is-valid-vers vers-err = call(is-valid-version has-version version):
+
+				new-item = if( and(has-version is-valid-vers)
+					put(del(new-item-1 'version') 'version' call(generate-new-version version))
+					new-item-1
+				)
+
+				check-ok err-text = cond(
+					not(has-id)                  list(false sprintf('id not found in task (%d)' selected-id))
+					not(eq(idvalue selected-id)) list(false sprintf('assuming same ids (%d <-> %d)' selected-id idvalue))
+					not(is-valid-vers)           list(false vers-err)
+					call(call(domain.get-task-validator new-item))
+				):
+
+				all-ok err-descr = if( check-ok
+					call(proc()
+						id-matcher = call(domain.task-id-match selected-id)
+
+						upd-func = func(x)
+							if( call(id-matcher x)
+								if( eq(get(x 'version') version)
+									list(true new-item)
+									list(false 'none')
+								)
+								list(false 'none')
+							)
+						end
+
+						was-any-updated = call(valuez.update col upd-func)
+						if( was-any-updated
+							list(true '')
+							list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
 						)
-						list(false 'none')
-					)
-				end
+					end)
 
-				was-any-updated = call(valuez.update col upd-func)
-				if( was-any-updated
-					list(true '')
-					list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
+					list(false err-text)
+				):
+
+				if( not(all-ok)
+					call(put-error w Status-Bad-Request str(err-descr))
+					'success'
 				)
 			end)
 
-			list(false err-text)
-		):
-
-		if( not(all-ok)
-			call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes str(err-descr)))
-			'success'
+			call(proc()
+				_ = call(log 'error in decoding: ' decode-err)
+				call(put-error w Status-Bad-Request 'invalid request body')
+			end)
 		)
 	end
 end
@@ -217,7 +238,7 @@ create-del-item = func(col)
 		taken-items = call(valuez.take-values col call(domain.task-id-match selected-id))
 
 		case( len(taken-items)
-			0 call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes sprintf('task with id %d not found' selected-id)))
+			0 call(put-error w Status-Bad-Request sprintf('task with id %d not found' selected-id))
 			'its ok'
 		)
 	end
@@ -225,32 +246,41 @@ end
 
 create-add-item = func(col task-id-var)
 	proc(w r params)
-		_ _ item-1 = call(stdjson.decode get(r 'body')):
-		has-id idvalue = getl(item-1 'id'):
+		decode-ok decode-err item-1 = call(stdjson.decode get(r 'body')):
 
-		item = call(domain.fill-missing-fields item-1)
+		if( decode-ok
+			call(proc()
+				has-id idvalue = getl(item-1 'id'):
+				item = call(domain.fill-missing-fields item-1)
+				is-valid err-text = call(call(domain.get-task-validator item)):
 
-		is-valid err-text = call(call(domain.get-task-validator item)):
+				_ _ next-id-val = if( and(is-valid not(has-id))
+					call(stdvar.change task-id-var func(x) plus(x 1) end)
+					list('not' 'valid' 'req')
+				):
 
-		_ _ next-id-val = if( and(is-valid not(has-id))
-			call(stdvar.change task-id-var func(x) plus(x 1) end)
-			list('not' 'valid' 'req')
-		):
+				if( has-id
+					call(put-error w Status-Bad-Request 'id not allowed in task when new task added')
+					if( is-valid
+						call(proc()
+							added-ok add-error = call(valuez.put-value col put(put(item 'id' next-id-val) 'version' 'v1')):
+							if( added-ok
+								call(stdhttp.write-response w Status-Created stdbytes.nl)
+								call(put-error w Status-Bad-Request sprintf('adding task failed: %s' add-error))
+							)
+						end)
 
-		if( has-id
-			call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes 'id not allowed in task when new task added'))
-			if( is-valid
-				call(proc()
-					added-ok add-error = call(valuez.put-value col put(put(item 'id' next-id-val) 'version' 'v1')):
-					if( added-ok
-						call(stdhttp.write-response w 201 stdbytes.nl)
-						call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes sprintf('adding task failed: %s' add-error)))
+						call(put-error w Status-Bad-Request sprintf('invalid task: %s' err-text))
 					)
-				end)
+				)
+			end)
 
-				call(stdhttp.write-response w 400 call(stdbytes.str-to-bytes sprintf('invalid task: %s' err-text)))
-			)
+			call(proc()
+				_ = call(log 'error in decoding: ' decode-err)
+				call(put-error w Status-Bad-Request 'invalid request body')
+			end)
 		)
+
 	end
 end
 
@@ -327,8 +357,15 @@ main = proc()
 			)
 	)
 
+	import stdos
+	# returns TCP port which is listened
+	get-port = proc()
+		found port = call(stdos.getenv 'TODOAPP_PORT'):
+		if(not(found) ':8003' plus(':' port))
+	end
+
 	router-info = map(
-		'addr'   ':8003'
+		'addr'   call(get-port) #':8003'
 		'routes' routes
 	)
 
@@ -340,16 +377,15 @@ main = proc()
 	shutdown = get(router 'shutdown')
 
 	# signal handler for doing router shutdown
-	import stdos
 	sig-handler = proc(signum sigtext)
-		_ = print('signal received: ' signum sigtext)
+		_ = call(log 'signal received: ' signum sigtext)
 		call(shutdown)
 	end
 	_ = call(stdos.reg-signal-handler sig-handler 2)
 
 	# wait and serve requests (until shutdown is made)
-	_ = print('...serving...')
-	_ = print('listen: ' call(listen))
+	_ = call(log '...serving...')
+	_ = call(log 'listen: ' call(listen))
 
 	_ = call(valuez.close db)
 	'done'
