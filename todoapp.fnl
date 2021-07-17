@@ -13,6 +13,7 @@ import stdlog
 import valuez
 
 import domain
+import uc
 
 # HTTP status codes
 Status-OK          = 200 # OK HTTP status code
@@ -284,6 +285,37 @@ create-add-item = func(col task-id-var)
 	end
 end
 
+create-add-item-v2 = func(col task-id-var uc-handler)
+	proc(w r params)
+		decode-ok decode-err item-1 = call(stdjson.decode get(r 'body')):
+
+		if( decode-ok
+			call(proc()
+				ctx = map(
+					'task-id-var' task-id-var
+					'col'         col
+				)
+				code err resp = call(uc-handler ctx map() item-1):
+				http-code = case( code
+					uc.No-Error        Status-Created
+					uc.Invalid-Request Status-Bad-Request
+					Status-Bad-Request
+				)
+				if( eq(code uc.No-Error)
+					call(stdhttp.write-response w Status-Created stdbytes.nl)
+					call(put-error w http-code err)
+				)
+			end)
+
+			call(proc()
+				_ = call(log 'error in decoding: ' decode-err)
+				call(put-error w Status-Bad-Request 'invalid request body')
+			end)
+		)
+
+	end
+end
+
 main = proc()
 	# open valuez data store
 	open-ok open-err db = call(valuez.open 'tasks'):
@@ -331,6 +363,12 @@ main = proc()
 			)
 
 		'POST' list(
+				# this v2 is just for development version
+				list(
+					list('todoapp' 'v2' 'tasks')
+					call(create-middle call(create-add-item-v2 col task-id-var uc.task-adder))
+				)
+
 				list(
 					list('todoapp' 'v1' 'tasks')
 					call(create-middle call(create-add-item col task-id-var))
