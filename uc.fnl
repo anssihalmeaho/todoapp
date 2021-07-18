@@ -32,8 +32,58 @@ generate-new-version = func(vers)
 	plus('v' str(plus(conv(slice(vers 1) 'int') 1)))
 end
 
+task-replacer = proc(ctx req msg)
+	col = get(ctx 'col')
+	selected-id = get(req 'selected-id')
+
+	has-id idvalue = getl(msg 'id'):
+
+	has-version version = getl(msg 'version'):
+	is-valid-vers vers-err = call(is-valid-version has-version version):
+
+	new-item = if( and(has-version is-valid-vers)
+		put(del(msg 'version') 'version' call(generate-new-version version))
+		msg
+	)
+
+	check-ok err-text = cond(
+		not(has-id)                  list(false sprintf('id not found in task (%d)' selected-id))
+		not(eq(idvalue selected-id)) list(false sprintf('assuming same ids (%d <-> %d)' selected-id idvalue))
+		not(is-valid-vers)           list(false vers-err)
+		call(call(domain.get-task-validator new-item))
+	):
+
+	all-ok err-descr = if( check-ok
+		call(proc()
+			id-matcher = call(domain.task-id-match selected-id)
+
+			upd-func = func(x)
+				if( call(id-matcher x)
+					if( eq(get(x 'version') version)
+						list(true new-item)
+						list(false 'none')
+					)
+					list(false 'none')
+				)
+			end
+
+			was-any-updated = call(valuez.update col upd-func)
+			if( was-any-updated
+				list(true '')
+				list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
+			)
+		end)
+
+		list(false err-text)
+	):
+
+	if( not(all-ok)
+		list(Invalid-Request str(err-descr) '')
+		list(No-Error '' '')
+	)
+end
+
 task-modifier = proc(ctx req msg)
-	task-id-var = get(ctx 'task-id-var')
 	col = get(ctx 'col')
 	selected-id = get(req 'selected-id')
 

@@ -92,67 +92,6 @@ create-middle = func(actual-handler)
 	)
 end
 
-create-replace-item = func(col)
-	proc(w r params)
-		selected-id = conv(get(params ':id') 'int')
-		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
-		if( decode-ok
-			call(proc()
-				has-id idvalue = getl(new-item-1 'id'):
-
-				has-version version = getl(new-item-1 'version'):
-				is-valid-vers vers-err = call(uc.is-valid-version has-version version):
-
-				new-item = if( and(has-version is-valid-vers)
-					put(del(new-item-1 'version') 'version' call(uc.generate-new-version version))
-					new-item-1
-				)
-
-				check-ok err-text = cond(
-					not(has-id)                  list(false sprintf('id not found in task (%d)' selected-id))
-					not(eq(idvalue selected-id)) list(false sprintf('assuming same ids (%d <-> %d)' selected-id idvalue))
-					not(is-valid-vers)           list(false vers-err)
-					call(call(domain.get-task-validator new-item))
-				):
-
-				all-ok err-descr = if( check-ok
-					call(proc()
-						id-matcher = call(domain.task-id-match selected-id)
-
-						upd-func = func(x)
-							if( call(id-matcher x)
-								if( eq(get(x 'version') version)
-									list(true new-item)
-									list(false 'none')
-								)
-								list(false 'none')
-							)
-						end
-
-						was-any-updated = call(valuez.update col upd-func)
-						if( was-any-updated
-							list(true '')
-							list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
-						)
-					end)
-
-					list(false err-text)
-				):
-
-				if( not(all-ok)
-					call(put-error w Status-Bad-Request str(err-descr))
-					'success'
-				)
-			end)
-
-			call(proc()
-				_ = call(log 'error in decoding: ' decode-err)
-				call(put-error w Status-Bad-Request 'invalid request body')
-			end)
-		)
-	end
-end
-
 create-del-item = func(col)
 	proc(w r params)
 		selected-id = conv(get(params ':id') 'int')
@@ -273,7 +212,7 @@ main = proc()
 		'PUT' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(create-middle call(create-replace-item col))
+					call(create-middle call(create-item-writer col task-id-var uc.task-replacer proc(w) 'ok' end))
 				)
 			)
 	)
