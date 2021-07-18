@@ -32,6 +32,18 @@ generate-new-version = func(vers)
 	plus('v' str(plus(conv(slice(vers 1) 'int') 1)))
 end
 
+task-deleter = proc(ctx req msg)
+	col = get(ctx 'col')
+	selected-id = get(req 'selected-id')
+
+	taken-items = call(valuez.take-values col call(domain.task-id-match selected-id))
+
+	case( len(taken-items)
+		0 list(Invalid-Request sprintf('task with id %d not found' selected-id) '')
+		list(No-Error '' '')
+	)
+end
+
 task-replacer = proc(ctx req msg)
 	col = get(ctx 'col')
 	selected-id = get(req 'selected-id')

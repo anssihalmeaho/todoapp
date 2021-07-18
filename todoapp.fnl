@@ -92,18 +92,6 @@ create-middle = func(actual-handler)
 	)
 end
 
-create-del-item = func(col)
-	proc(w r params)
-		selected-id = conv(get(params ':id') 'int')
-		taken-items = call(valuez.take-values col call(domain.task-id-match selected-id))
-
-		case( len(taken-items)
-			0 call(put-error w Status-Bad-Request sprintf('task with id %d not found' selected-id))
-			'its ok'
-		)
-	end
-end
-
 get-task-id-if-found = func(params inmap)
 	has-id id-val = getl(params ':id'):
 	cond(
@@ -116,7 +104,15 @@ end
 create-item-writer = func(col task-id-var uc-handler ok-writer)
 	proc(w r params)
 		req = call(get-task-id-if-found params map())
-		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
+		body-found body = getl(r 'body'):
+		has-body = and(
+			body-found
+			gt(call(stdbytes.count body) 0)
+		)
+		decode-ok decode-err item = if( has-body
+			call(stdjson.decode get(r 'body'))
+			list(true '' map()) # cases when there is no body
+		):
 
 		if( decode-ok
 			call(proc()
@@ -124,7 +120,7 @@ create-item-writer = func(col task-id-var uc-handler ok-writer)
 					'task-id-var' task-id-var
 					'col'         col
 				)
-				code err resp = call(uc-handler ctx req new-item-1):
+				code err resp = call(uc-handler ctx req item):
 				http-code = case( code
 					uc.Invalid-Request Status-Bad-Request
 					Status-Bad-Request
@@ -205,7 +201,7 @@ main = proc()
 		'DELETE' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(create-middle call(create-del-item col))
+					call(create-middle call(create-item-writer col task-id-var uc.task-deleter proc(w) 'ok' end))
 				)
 			)
 
