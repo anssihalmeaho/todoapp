@@ -245,47 +245,7 @@ create-del-item = func(col)
 	end
 end
 
-create-add-item = func(col task-id-var)
-	proc(w r params)
-		decode-ok decode-err item-1 = call(stdjson.decode get(r 'body')):
-
-		if( decode-ok
-			call(proc()
-				has-id idvalue = getl(item-1 'id'):
-				item = call(domain.fill-missing-fields item-1)
-				is-valid err-text = call(call(domain.get-task-validator item)):
-
-				_ _ next-id-val = if( and(is-valid not(has-id))
-					call(stdvar.change task-id-var func(x) plus(x 1) end)
-					list('not' 'valid' 'req')
-				):
-
-				if( has-id
-					call(put-error w Status-Bad-Request 'id not allowed in task when new task added')
-					if( is-valid
-						call(proc()
-							added-ok add-error = call(valuez.put-value col put(put(item 'id' next-id-val) 'version' 'v1')):
-							if( added-ok
-								call(stdhttp.write-response w Status-Created stdbytes.nl)
-								call(put-error w Status-Bad-Request sprintf('adding task failed: %s' add-error))
-							)
-						end)
-
-						call(put-error w Status-Bad-Request sprintf('invalid task: %s' err-text))
-					)
-				)
-			end)
-
-			call(proc()
-				_ = call(log 'error in decoding: ' decode-err)
-				call(put-error w Status-Bad-Request 'invalid request body')
-			end)
-		)
-
-	end
-end
-
-create-add-item-v2 = func(col task-id-var uc-handler)
+create-add-item = func(col task-id-var uc-handler)
 	proc(w r params)
 		decode-ok decode-err item-1 = call(stdjson.decode get(r 'body')):
 
@@ -363,15 +323,9 @@ main = proc()
 			)
 
 		'POST' list(
-				# this v2 is just for development version
-				list(
-					list('todoapp' 'v2' 'tasks')
-					call(create-middle call(create-add-item-v2 col task-id-var uc.task-adder))
-				)
-
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(create-middle call(create-add-item col task-id-var))
+					call(create-middle call(create-add-item col task-id-var uc.task-adder))
 				)
 
 				list(
