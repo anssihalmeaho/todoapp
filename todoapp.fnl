@@ -80,24 +80,6 @@ create-get-all-matching-items = func(col)
 	end
 end
 
-is-valid-version = func(has-version version)
-	check-version-format = func(vers)
-		import stdstr
-		and(
-			call(stdstr.is-digit slice(version 1))
-			call(stdstr.startswith version 'v')
-		)
-	end
-
-	cond(
-		not(has-version)                        list(false 'version not found')
-		not(eq(type(version) 'string'))         list(false 'version assumed to be string')
-		lt(len(version) 2)                      list(false sprintf('too short version (%s)' version))
-		not(call(check-version-format version)) list(false sprintf('invalid format for version (%s)' version))
-		list(true '')
-	)
-end
-
 create-middle = func(actual-handler)
 	if( false
 		proc(w r params)
@@ -110,68 +92,6 @@ create-middle = func(actual-handler)
 	)
 end
 
-generate-new-version = func(vers)
-	plus('v' str(plus(conv(slice(vers 1) 'int') 1)))
-end
-
-create-modify-item = func(col)
-	proc(w r params)
-		selected-id = conv(get(params ':id') 'int')
-		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
-
-		if( decode-ok
-			call(proc()
-				has-version version = getl(new-item-1 'version'):
-				check-ok err-text = call(is-valid-version has-version version):
-
-				new-item = if( and(has-version check-ok)
-					put(del(new-item-1 'version') 'version' call(generate-new-version version))
-					new-item-1
-				)
-
-				# following part is same as in replace (duplicate code)
-				all-ok err-descr = if( check-ok
-					call(proc()
-						id-matcher = call(domain.task-id-match selected-id)
-
-						upd-func = func(x)
-							if( call(id-matcher x)
-								if( eq(get(x 'version') version)
-									call(func()
-										modified-item = call(domain.interleave-fields x new-item)
-										list(true modified-item)
-									end)
-									list(false 'none')
-								)
-								list(false 'none')
-							)
-						end
-
-						was-any-updated = call(valuez.update col upd-func)
-						if( was-any-updated
-							list(true '')
-							list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
-						)
-					end)
-
-					list(false err-text)
-				):
-
-				if( not(all-ok)
-					call(put-error w Status-Bad-Request str(err-descr))
-					'success'
-				)
-			end)
-
-			call(proc()
-				_ = call(log 'error in decoding: ' decode-err)
-				call(put-error w Status-Bad-Request 'invalid request body')
-			end)
-		)
-
-	end
-end
-
 create-replace-item = func(col)
 	proc(w r params)
 		selected-id = conv(get(params ':id') 'int')
@@ -181,10 +101,10 @@ create-replace-item = func(col)
 				has-id idvalue = getl(new-item-1 'id'):
 
 				has-version version = getl(new-item-1 'version'):
-				is-valid-vers vers-err = call(is-valid-version has-version version):
+				is-valid-vers vers-err = call(uc.is-valid-version has-version version):
 
 				new-item = if( and(has-version is-valid-vers)
-					put(del(new-item-1 'version') 'version' call(generate-new-version version))
+					put(del(new-item-1 'version') 'version' call(uc.generate-new-version version))
 					new-item-1
 				)
 
@@ -245,9 +165,19 @@ create-del-item = func(col)
 	end
 end
 
-create-add-item = func(col task-id-var uc-handler)
+get-task-id-if-found = func(params inmap)
+	has-id id-val = getl(params ':id'):
+	cond(
+		in(inmap 'selected-id') inmap
+		has-id put(inmap 'selected-id' conv(id-val 'int'))
+		inmap
+	)
+end
+
+create-item-writer = func(col task-id-var uc-handler ok-writer)
 	proc(w r params)
-		decode-ok decode-err item-1 = call(stdjson.decode get(r 'body')):
+		req = call(get-task-id-if-found params map())
+		decode-ok decode-err new-item-1 = call(stdjson.decode get(r 'body')):
 
 		if( decode-ok
 			call(proc()
@@ -255,14 +185,13 @@ create-add-item = func(col task-id-var uc-handler)
 					'task-id-var' task-id-var
 					'col'         col
 				)
-				code err resp = call(uc-handler ctx map() item-1):
+				code err resp = call(uc-handler ctx req new-item-1):
 				http-code = case( code
-					uc.No-Error        Status-Created
 					uc.Invalid-Request Status-Bad-Request
 					Status-Bad-Request
 				)
 				if( eq(code uc.No-Error)
-					call(stdhttp.write-response w Status-Created stdbytes.nl)
+					call(ok-writer w)
 					call(put-error w http-code err)
 				)
 			end)
@@ -325,12 +254,12 @@ main = proc()
 		'POST' list(
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(create-middle call(create-add-item col task-id-var uc.task-adder))
+					call(create-middle call(create-item-writer col task-id-var uc.task-adder proc(w) call(stdhttp.write-response w Status-Created stdbytes.nl) end))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(create-middle call(create-modify-item col))
+					call(create-middle call(create-item-writer col task-id-var uc.task-modifier proc(w) 'ok' end))
 				)
 			)
 
