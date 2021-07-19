@@ -34,10 +34,13 @@ func addOwnModules() (err error) {
 	if err = funl.AddFunModToNamespace("domain", []byte(domain)); err != nil {
 		return
 	}
+	if err = funl.AddFunModToNamespace("er", []byte(er)); err != nil {
+		return
+	}
 	if err = funl.AddFunModToNamespace("uc", []byte(uc)); err != nil {
 		return
 	}
-	if err = funl.AddFunModToNamespace("er", []byte(er)); err != nil {
+	if err = funl.AddFunModToNamespace("http", []byte(http)); err != nil {
 		return
 	}
 	return nil
