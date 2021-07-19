@@ -47,8 +47,6 @@ main = proc()
 	)
 	task-id-var = call(stdvar.new biggest-id)
 
-	# define HTTP routes
-	import httprouter
 
 	routes = map(
 		'GET' list(
@@ -103,24 +101,7 @@ main = proc()
 		'routes' routes
 	)
 
-	# create new router instance
-	router = call(httprouter.new-router router-info)
-
-	# get router procedures
-	listen = get(router 'listen')
-	shutdown = get(router 'shutdown')
-
-	# signal handler for doing router shutdown
-	sig-handler = proc(signum sigtext)
-		_ = call(log 'signal received: ' signum sigtext)
-		call(shutdown)
-	end
-	_ = call(stdos.reg-signal-handler sig-handler 2)
-
-	# wait and serve requests (until shutdown is made)
-	_ = call(log '...serving...')
-	_ = call(log 'listen: ' call(listen))
-
+	_ = call(http.run router-info)
 	_ = call(valuez.close db)
 	'done'
 end

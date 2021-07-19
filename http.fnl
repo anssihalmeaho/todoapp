@@ -23,8 +23,29 @@ is-debug-on = false
 debug = call(stdpr.get-pr is-debug-on)
 debugpp = call(stdpr.get-pp-pr is-debug-on)
 
-run = proc(routes)
-	true
+run = proc(router-info)
+	import httprouter
+	import stdos
+
+	# create new router instance
+	router = call(httprouter.new-router router-info)
+
+	# get router procedures
+	listen = get(router 'listen')
+	shutdown = get(router 'shutdown')
+
+	# signal handler for doing router shutdown
+	sig-handler = proc(signum sigtext)
+		_ = call(log 'signal received: ' signum sigtext)
+		call(shutdown)
+	end
+	_ = call(stdos.reg-signal-handler sig-handler 2)
+
+	# wait and serve requests (until shutdown is made)
+	_ = call(log '...serving...')
+	_ = call(log 'listen: ' call(listen))
+
+	'none'
 end
 
 put-created = proc(w)
