@@ -12,7 +12,6 @@ import stdlog
 
 import valuez
 
-import domain
 import uc
 
 # HTTP status codes
@@ -32,18 +31,7 @@ put-error = proc(w status-code text)
 	call(stdhttp.write-response w status-code call(stdbytes.str-to-bytes text))
 end
 
-create-get-item-with-id = func(col)
-	proc(w r params)
-		selected-id = conv(get(params ':id') 'int')
-		matched-items = call(valuez.get-values col call(domain.task-id-match selected-id))
-
-		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
-		_ _ response = call(stdjson.encode matched-items):
-		call(stdhttp.write-response w Status-OK response)
-	end
-end
-
-create-get-all-matching-items = func(col)
+create-items-reader = func(col uc-handler)
 	get-query-params = func(keyname qparams result-map)
 		has-key query-str-list = getl(qparams keyname):
 
@@ -62,18 +50,23 @@ create-get-all-matching-items = func(col)
 		)
 	end
 
-	proc(w r)
+	proc(w r params)
 		call(debug 'trying: ' try(call(proc()
 
+		req = call(get-task-id-if-found params map())
+		ctx = map('col' col)
+
+		# query parameters are really not for case when id is given
 		query-params = call(debug 'query: ' get(r 'query'))
 		qp-getter = func(keyname cum) call(get-query-params keyname query-params cum) end
-		query-map = call(stdfu.foreach call(domain.get-query-names) qp-getter map())
+		query-map = call(stdfu.foreach call(uc.get-query-names) qp-getter map())
 
-		query-func = call(domain.get-query-func query-map)
-		all-items = call(valuez.get-values col func(item) call(query-func item) end)
+		req2 = put(req 'query-map' query-map)
+
+		items = call(uc-handler ctx req2)
 
 		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
-		_ _ response = call(stdjson.encode all-items):
+		_ _ response = call(stdjson.encode items):
 		call(stdhttp.write-response w Status-OK response)
 
 		end)))
@@ -177,12 +170,12 @@ main = proc()
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(create-middle call(create-get-item-with-id col))
+					call(create-middle call(create-items-reader col uc.task-getter-by-id))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(create-middle call(create-get-all-matching-items col))
+					call(create-middle call(create-items-reader col uc.task-getter))
 				)
 			)
 

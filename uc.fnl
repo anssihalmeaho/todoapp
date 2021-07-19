@@ -5,6 +5,12 @@ import domain
 
 import valuez
 import stdvar
+import stdpr
+
+# set debug print functions
+is-debug-on = false
+debug = call(stdpr.get-pr is-debug-on)
+debugpp = call(stdpr.get-pp-pr is-debug-on)
 
 # error codes
 No-Error = 1
@@ -30,6 +36,27 @@ end
 
 generate-new-version = func(vers)
 	plus('v' str(plus(conv(slice(vers 1) 'int') 1)))
+end
+
+get-query-names = proc()
+	call(domain.get-query-names)
+end
+
+task-getter = proc(ctx req)
+	col = get(ctx 'col')
+	query-map = get(req 'query-map')
+
+	query-func = call(domain.get-query-func query-map)
+	matched-items = call(valuez.get-values col func(item) call(query-func item) end)
+	matched-items
+end
+
+task-getter-by-id = proc(ctx req)
+	col = get(ctx 'col')
+	selected-id = get(req 'selected-id')
+
+	matched-items = call(valuez.get-values col call(domain.task-id-match selected-id))
+	matched-items
 end
 
 task-deleter = proc(ctx req msg)
