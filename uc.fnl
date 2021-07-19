@@ -2,8 +2,9 @@
 ns uc
 
 import domain
-
+import er
 import valuez
+
 import stdvar
 import stdpr
 
@@ -11,10 +12,6 @@ import stdpr
 is-debug-on = false
 debug = call(stdpr.get-pr is-debug-on)
 debugpp = call(stdpr.get-pp-pr is-debug-on)
-
-# error codes
-No-Error = 1
-Invalid-Request = 2
 
 is-valid-version = func(has-version version)
 	check-version-format = func(vers)
@@ -66,8 +63,8 @@ task-deleter = proc(ctx req msg)
 	taken-items = call(valuez.take-values col call(domain.task-id-match selected-id))
 
 	case( len(taken-items)
-		0 list(Invalid-Request sprintf('task with id %d not found' selected-id) '')
-		list(No-Error '' '')
+		0 list(er.Invalid-Request sprintf('task with id %d not found' selected-id) '')
+		list(er.No-Error '' '')
 	)
 end
 
@@ -117,8 +114,8 @@ task-replacer = proc(ctx req msg)
 	):
 
 	if( not(all-ok)
-		list(Invalid-Request str(err-descr) '')
-		list(No-Error '' '')
+		list(er.Invalid-Request str(err-descr) '')
+		list(er.No-Error '' '')
 	)
 end
 
@@ -163,8 +160,8 @@ task-modifier = proc(ctx req msg)
 	):
 
 	if( not(all-ok)
-		list(Invalid-Request str(err-descr) '')
-		list(No-Error '' '')
+		list(er.Invalid-Request str(err-descr) '')
+		list(er.No-Error '' '')
 	)
 end
 
@@ -182,17 +179,17 @@ task-adder = proc(ctx req msg)
 	):
 
 	if( has-id
-		list(Invalid-Request 'id not allowed in task when new task added' '')
+		list(er.Invalid-Request 'id not allowed in task when new task added' '')
 		if( is-valid
 			call(proc()
 				added-ok add-error = call(valuez.put-value col put(put(item 'id' next-id-val) 'version' 'v1')):
 				if( added-ok
-					list(No-Error '' '')
-					list(Invalid-Request sprintf('adding task failed: %s' add-error) '')
+					list(er.No-Error '' '')
+					list(er.Invalid-Request sprintf('adding task failed: %s' add-error) '')
 				)
 			end)
 
-			list(Invalid-Request sprintf('invalid task: %s' err-text) '')
+			list(er.Invalid-Request sprintf('invalid task: %s' err-text) '')
 		)
 	)
 end

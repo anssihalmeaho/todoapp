@@ -8,7 +8,7 @@ import stdbytes
 import stdfu
 import stdhttp
 
-import uc
+import er
 
 # HTTP status codes
 Status-OK          = 200 # OK HTTP status code
@@ -56,7 +56,7 @@ put-error = proc(w status-code text)
 	call(stdhttp.write-response w status-code call(stdbytes.str-to-bytes text))
 end
 
-create-items-reader = func(col uc-handler)
+create-items-reader = func(col uc-handler query-names-getter)
 	get-query-params = func(keyname qparams result-map)
 		has-key query-str-list = getl(qparams keyname):
 
@@ -84,7 +84,7 @@ create-items-reader = func(col uc-handler)
 		# query parameters are really not for case when id is given
 		query-params = call(debug 'query: ' get(r 'query'))
 		qp-getter = func(keyname cum) call(get-query-params keyname query-params cum) end
-		query-map = call(stdfu.foreach call(uc.get-query-names) qp-getter map())
+		query-map = call(stdfu.foreach call(query-names-getter) qp-getter map())
 
 		req2 = put(req 'query-map' query-map)
 
@@ -140,10 +140,10 @@ create-item-writer = func(col task-id-var uc-handler ok-writer)
 				)
 				code err resp = call(uc-handler ctx req item):
 				http-code = case( code
-					uc.Invalid-Request Status-Bad-Request
+					er.Invalid-Request Status-Bad-Request
 					Status-Bad-Request
 				)
-				if( eq(code uc.No-Error)
+				if( eq(code er.No-Error)
 					call(ok-writer w)
 					call(put-error w http-code err)
 				)
@@ -154,7 +154,6 @@ create-item-writer = func(col task-id-var uc-handler ok-writer)
 				call(put-error w Status-Bad-Request 'invalid request body')
 			end)
 		)
-
 	end
 end
 

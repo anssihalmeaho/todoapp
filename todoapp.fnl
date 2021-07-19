@@ -1,22 +1,16 @@
 
 ns main
 
-import stdhttp
-
 import stdvar
-import stdjson
-import stdbytes
 import stddbc
 import stdfu
-import stdlog
 
 import valuez
-
-import uc
 import http
+import uc
 
-# logger to use in this server
-log = call(stdlog.get-default-logger map('prefix' 'todoapp: ' 'date' true 'time' true))
+# use logger from http
+log = http.log
 
 main = proc()
 	# open valuez data store
@@ -47,18 +41,17 @@ main = proc()
 	)
 	task-id-var = call(stdvar.new biggest-id)
 
-
 	routes = map(
 		'GET' list(
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-items-reader col uc.task-getter-by-id))
+					call(http.create-middle call(http.create-items-reader col uc.task-getter-by-id uc.get-query-names))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-items-reader col uc.task-getter))
+					call(http.create-middle call(http.create-items-reader col uc.task-getter uc.get-query-names))
 				)
 			)
 
@@ -89,15 +82,16 @@ main = proc()
 			)
 	)
 
-	import stdos
 	# returns TCP port which is listened
 	get-port = proc()
+		import stdos
+
 		found port = call(stdos.getenv 'TODOAPP_PORT'):
 		if(not(found) ':8003' plus(':' port))
 	end
 
 	router-info = map(
-		'addr'   call(get-port) #':8003'
+		'addr'   call(get-port)
 		'routes' routes
 	)
 
