@@ -59,38 +59,38 @@ main = proc()
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-items-reader store uc.task-getter-by-id uc.get-query-names))
+					call(http.create-middle call(http.create-items-reader call(uc.new-task-getter-by-id store) uc.get-query-names))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-items-reader store uc.task-getter uc.get-query-names))
+					call(http.create-middle call(http.create-items-reader call(uc.new-task-getter store) uc.get-query-names))
 				)
 			)
 
 		'POST' list(
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-adder http.put-created))
+					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-adder store) http.put-created))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-modifier proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-modifier store) proc(w) 'ok' end))
 				)
 			)
 
 		'DELETE' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-deleter proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-deleter store) proc(w) 'ok' end))
 				)
 			)
 
 		'PUT' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-replacer proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-replacer store) proc(w) 'ok' end))
 				)
 			)
 	)
