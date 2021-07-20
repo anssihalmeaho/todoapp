@@ -56,7 +56,7 @@ put-error = proc(w status-code text)
 	call(stdhttp.write-response w status-code call(stdbytes.str-to-bytes text))
 end
 
-create-items-reader = func(col uc-handler query-names-getter)
+create-items-reader = func(store uc-handler query-names-getter)
 	get-query-params = func(keyname qparams result-map)
 		has-key query-str-list = getl(qparams keyname):
 
@@ -79,7 +79,7 @@ create-items-reader = func(col uc-handler query-names-getter)
 		call(debug 'trying: ' try(call(proc()
 
 		req = call(get-task-id-if-found params map())
-		ctx = map('col' col)
+		ctx = map('store' store)
 
 		# query parameters are really not for case when id is given
 		query-params = call(debug 'query: ' get(r 'query'))
@@ -119,7 +119,7 @@ get-task-id-if-found = func(params inmap)
 	)
 end
 
-create-item-writer = func(col task-id-var uc-handler ok-writer)
+create-item-writer = func(store task-id-var uc-handler ok-writer)
 	proc(w r params)
 		req = call(get-task-id-if-found params map())
 		body-found body = getl(r 'body'):
@@ -136,7 +136,7 @@ create-item-writer = func(col task-id-var uc-handler ok-writer)
 			call(proc()
 				ctx = map(
 					'task-id-var' task-id-var
-					'col'         col
+					'store'         store
 				)
 				code err resp = call(uc-handler ctx req item):
 				http-code = case( code

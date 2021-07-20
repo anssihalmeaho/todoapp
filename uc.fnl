@@ -3,7 +3,6 @@ ns uc
 
 import domain
 import er
-import valuez
 
 import stdvar
 import stdpr
@@ -40,27 +39,30 @@ get-query-names = proc()
 end
 
 task-getter = proc(ctx req)
-	col = get(ctx 'col')
+	store = get(ctx 'store')
 	query-map = get(req 'query-map')
+	get-values = get(store 'get-values')
 
 	query-func = call(domain.get-query-func query-map)
-	matched-items = call(valuez.get-values col func(item) call(query-func item) end)
+	matched-items = call(get-values func(item) call(query-func item) end)
 	matched-items
 end
 
 task-getter-by-id = proc(ctx req)
-	col = get(ctx 'col')
+	store = get(ctx 'store')
 	selected-id = get(req 'selected-id')
+	get-values = get(store 'get-values')
 
-	matched-items = call(valuez.get-values col call(domain.task-id-match selected-id))
+	matched-items = call(get-values call(domain.task-id-match selected-id))
 	matched-items
 end
 
 task-deleter = proc(ctx req msg)
-	col = get(ctx 'col')
+	store = get(ctx 'store')
 	selected-id = get(req 'selected-id')
+	take-values = get(store 'take-values')
 
-	taken-items = call(valuez.take-values col call(domain.task-id-match selected-id))
+	taken-items = call(take-values call(domain.task-id-match selected-id))
 
 	case( len(taken-items)
 		0 list(er.Invalid-Request sprintf('task with id %d not found' selected-id) '')
@@ -69,8 +71,9 @@ task-deleter = proc(ctx req msg)
 end
 
 task-replacer = proc(ctx req msg)
-	col = get(ctx 'col')
+	store = get(ctx 'store')
 	selected-id = get(req 'selected-id')
+	update = get(store 'update')
 
 	has-id idvalue = getl(msg 'id'):
 
@@ -103,7 +106,7 @@ task-replacer = proc(ctx req msg)
 				)
 			end
 
-			was-any-updated = call(valuez.update col upd-func)
+			was-any-updated = call(update upd-func)
 			if( was-any-updated
 				list(true '')
 				list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
@@ -120,8 +123,9 @@ task-replacer = proc(ctx req msg)
 end
 
 task-modifier = proc(ctx req msg)
-	col = get(ctx 'col')
+	store = get(ctx 'store')
 	selected-id = get(req 'selected-id')
+	update = get(store 'update')
 
 	has-version version = getl(msg 'version'):
 	check-ok err-text = call(is-valid-version has-version version):
@@ -149,7 +153,7 @@ task-modifier = proc(ctx req msg)
 				)
 			end
 
-			was-any-updated = call(valuez.update col upd-func)
+			was-any-updated = call(update upd-func)
 			if( was-any-updated
 				list(true '')
 				list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
@@ -167,7 +171,8 @@ end
 
 task-adder = proc(ctx req msg)
 	task-id-var = get(ctx 'task-id-var')
-	col = get(ctx 'col')
+	store = get(ctx 'store')
+	put-value = get(store 'put-value')
 
 	has-id idvalue = getl(msg 'id'):
 	item = call(domain.fill-missing-fields msg)
@@ -182,7 +187,7 @@ task-adder = proc(ctx req msg)
 		list(er.Invalid-Request 'id not allowed in task when new task added' '')
 		if( is-valid
 			call(proc()
-				added-ok add-error = call(valuez.put-value col put(put(item 'id' next-id-val) 'version' 'v1')):
+				added-ok add-error = call(put-value put(put(item 'id' next-id-val) 'version' 'v1')):
 				if( added-ok
 					list(er.No-Error '' '')
 					list(er.Invalid-Request sprintf('adding task failed: %s' add-error) '')

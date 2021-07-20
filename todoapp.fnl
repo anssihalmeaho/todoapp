@@ -1,19 +1,16 @@
 
 ns main
 
-import stdvar
-import stddbc
-import stdfu
-
-import valuez
 import http
-import uc
 
 # use logger from http
 log = http.log
 
-main = proc()
-	# open valuez data store
+new-store = proc()
+	import valuez
+	import stddbc
+	import stdfu
+
 	open-ok open-err db = call(valuez.open 'tasks'):
 	_ = call(stddbc.assert open-ok open-err)
 
@@ -39,6 +36,22 @@ main = proc()
 		end)
 		10
 	)
+
+	store-object = map(
+		'get-values'  proc(matcher) call(valuez.get-values col matcher) end
+		'take-values' proc(matcher) call(valuez.take-values col matcher) end
+		'update'      proc(matcher) call(valuez.update col matcher) end
+		'put-value'   proc(item) call(valuez.put-value col item) end
+	)
+
+	list(store-object biggest-id proc() call(valuez.close db) end)
+end
+
+main = proc()
+	import stdvar
+	import uc
+
+	store biggest-id closer = call(new-store):
 	task-id-var = call(stdvar.new biggest-id)
 
 	routes = map(
@@ -46,38 +59,38 @@ main = proc()
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-items-reader col uc.task-getter-by-id uc.get-query-names))
+					call(http.create-middle call(http.create-items-reader store uc.task-getter-by-id uc.get-query-names))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-items-reader col uc.task-getter uc.get-query-names))
+					call(http.create-middle call(http.create-items-reader store uc.task-getter uc.get-query-names))
 				)
 			)
 
 		'POST' list(
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-item-writer col task-id-var uc.task-adder http.put-created))
+					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-adder http.put-created))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer col task-id-var uc.task-modifier proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-modifier proc(w) 'ok' end))
 				)
 			)
 
 		'DELETE' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer col task-id-var uc.task-deleter proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-deleter proc(w) 'ok' end))
 				)
 			)
 
 		'PUT' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer col task-id-var uc.task-replacer proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer store task-id-var uc.task-replacer proc(w) 'ok' end))
 				)
 			)
 	)
@@ -96,7 +109,7 @@ main = proc()
 	)
 
 	_ = call(http.run router-info)
-	_ = call(valuez.close db)
+	_ = call(closer)
 	'done'
 end
 
