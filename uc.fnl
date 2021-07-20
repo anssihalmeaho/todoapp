@@ -39,7 +39,7 @@ get-query-names = func()
 end
 
 new-task-getter = proc(store)
-	proc(ctx req)
+	proc(ctx req msg)
 		query-map = get(req 'query-map')
 		get-values = get(store 'get-values')
 
@@ -50,7 +50,7 @@ new-task-getter = proc(store)
 end
 
 new-task-getter-by-id = proc(store)
-	proc(ctx req)
+	proc(ctx req msg)
 		selected-id = get(req 'selected-id')
 		get-values = get(store 'get-values')
 

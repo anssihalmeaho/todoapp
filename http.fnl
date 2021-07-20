@@ -88,7 +88,7 @@ create-items-reader = func(uc-handler query-names-getter)
 
 		req2 = put(req 'query-map' query-map)
 
-		items = call(uc-handler ctx req2)
+		items = call(uc-handler ctx req2 map())
 
 		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
 		_ _ response = call(stdjson.encode items):
