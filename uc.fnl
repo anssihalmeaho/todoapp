@@ -145,7 +145,11 @@ new-task-modifier = proc(store)
 						if( eq(get(x 'version') version)
 							call(func()
 								modified-item = call(domain.interleave-fields x new-item)
-								list(true modified-item)
+								is-valid validity-err = call(call(domain.get-task-validator modified-item)):
+								if( is-valid
+									list(true modified-item)
+									list(false 'none') # how to get error text ..?
+								)
 							end)
 							list(false 'none')
 						)
@@ -156,7 +160,7 @@ new-task-modifier = proc(store)
 				was-any-updated = call(update upd-func)
 				if( was-any-updated
 					list(true '')
-					list(false sprintf('task not found (id: %d) or version mismatch' selected-id))
+					list(false sprintf('task not found (id: %d) or version mismatch or invalid data' selected-id))
 				)
 			end)
 
