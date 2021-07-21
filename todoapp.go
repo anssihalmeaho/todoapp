@@ -15,6 +15,15 @@ var program string
 //go:embed domain.fnl
 var domain string
 
+//go:embed uc.fnl
+var uc string
+
+//go:embed http.fnl
+var http string
+
+//go:embed er.fnl
+var er string
+
 //go:embed imported/httprouter.fnl
 var httprouter string
 
@@ -23,6 +32,15 @@ func addOwnModules() (err error) {
 		return
 	}
 	if err = funl.AddFunModToNamespace("domain", []byte(domain)); err != nil {
+		return
+	}
+	if err = funl.AddFunModToNamespace("er", []byte(er)); err != nil {
+		return
+	}
+	if err = funl.AddFunModToNamespace("uc", []byte(uc)); err != nil {
+		return
+	}
+	if err = funl.AddFunModToNamespace("http", []byte(http)); err != nil {
 		return
 	}
 	return nil
