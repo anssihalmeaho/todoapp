@@ -361,8 +361,11 @@ curl http://localhost:9001/todoapp/v1/tasks
 Server is implemented with:
 
 * **todoapp.go** => thin Go language wrapper (main program) to run todoapp.fnl
-* **todoapp.fnl** => actual server implementation
+* **todoapp.fnl** => main module, sets up store interface and HTTP routing
+* **uc.fnl** => use case implementations, uses store interface and domain functions
+* **http.fnl** => contains HTTP and JSON processing for requests and responses (uses **httprouter**)
 * **domain.fnl** => pure functions to implement task data handling
+* **er.fnl** => error values defined between **uc** and **http** modules
 * **imported/httprouter.fnl** => HTTP router library implemented in FunL
 * **ValueZ** data store is used for storing tasks
 
@@ -374,6 +377,29 @@ Go wrapper todoapp.go sets up following modules to FunL module cache:
 * ValueZ value store (external module implemented in Go): https://github.com/anssihalmeaho/fuvaluez
 * httprouter: https://github.com/anssihalmeaho/httprouter
 * domain
+* er
+* uc
+* http
 
 ValueZ creates **tasks.db** file to working directory which contains all task data.
+
+### Clean architecture
+
+Implementation structure is based on so-called __Clean Architecture__ model:
+
+* externals (ValueZ data store, HTTP/JSON processing)
+* interfaces or adapters (store interface, which hides data storage)
+* use case layer (**uc** module)
+* domain model or entities (**domain** module)
+
+There's also "main" programs to setup other parts:
+
+* **todoapp.go** sets up needed source modules and external library (ValueZ)
+* **todoapp.fnl** is FunL main module to setup store interface, use case layer and HTTP module
+
+Clean Architecture (or Onion Architecture or Hexagonal Architecture or functional core, imperative shell), see:
+https://github.com/kbilsted/Functional-core-imperative-shell/blob/master/README.md
+
+Here's also blog writing where division is made in example so that impure part is implemented with Go and pure functional part in FunL:
+https://programmingfunl.wordpress.com/2021/04/19/using-funl-as-functional-core-embedded-in-go
 
