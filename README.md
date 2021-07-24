@@ -403,3 +403,8 @@ https://github.com/kbilsted/Functional-core-imperative-shell/blob/master/README.
 Here's also blog writing where division is made in example so that impure part is implemented with Go and pure functional part in FunL:
 https://programmingfunl.wordpress.com/2021/04/19/using-funl-as-functional-core-embedded-in-go
 
+**Todoapp architecture**: 
+
+![](https://github.com/anssihalmeaho/todoapp/blob/main/todo_arch.png)
+
+
