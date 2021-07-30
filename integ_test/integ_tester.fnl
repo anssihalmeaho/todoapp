@@ -5,6 +5,7 @@ import stdjson
 import stdhttp
 import stddbc
 import stdpr
+import stdfu
 
 # set debug print functions
 debug = call(stdpr.get-pr true)
@@ -48,6 +49,16 @@ get-tasks = proc()
 	val
 end
 
+delete-task = proc(task-id)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks/%d' port-number task-id)
+	response = call(stdhttp.do 'DELETE' server-endpoint map())
+	call(check-response-ok response 200)
+end
+
+delete-tasks = proc(task-ids)
+	call(stdfu.ploop delete-task task-ids 'none')
+end
+
 main = proc()
 	task-A = map(
 		'name'        'A'
@@ -60,7 +71,14 @@ main = proc()
 		'description' 'text-B'
 	)
 	_ = call(add-task task-B)
-	_ = call(debugpp 'tasks: ' call(get-tasks))
+	tasks = call(debugpp 'tasks: ' call(get-tasks))
+	_ = call(verify eq(len(tasks) 2) sprintf('unexpected task count: %d' len(tasks)))
+	task-ids = call(stdfu.apply tasks func(v) get(v 'id') end)
+
+	_ = call(delete-tasks task-ids)
+	tasks2 = call(debugpp 'after delete: ' call(get-tasks))
+	_ = call(verify eq(len(tasks2) 0) sprintf('unexpected task count: %d' len(tasks2)))
+
 	'OK'
 end
 
