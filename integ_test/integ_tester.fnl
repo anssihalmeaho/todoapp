@@ -70,6 +70,21 @@ check-tasks = proc(tasks task-A task-B)
 	true
 end
 
+get-task-by-id = proc(task-id)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks/%d' port-number task-id)
+	response = call(stdhttp.do 'GET' server-endpoint map())
+	_ = call(check-response-ok response 200)
+	ok err val = call(stdjson.decode get(response 'body')):
+	_ = call(stddbc.assert ok err)
+	_ = call(stddbc.assert eq(len(val) 1) 'Exactly one task assumed')
+	head(val)
+end
+
+check-tasks-by-id = proc(task-ids task-A task-B)
+	tasks = call(stdfu.ploop proc(tid cum) append(cum call(get-task-by-id tid)) end task-ids list())
+	call(check-tasks tasks task-A task-B)
+end
+
 main = proc()
 	# Add two tasks
 	task-A = map(
@@ -89,6 +104,7 @@ main = proc()
 	_ = call(verify eq(len(tasks) 2) sprintf('unexpected task count: %d' len(tasks)))
 	_ = call(check-tasks tasks task-A task-B)
 	task-ids = call(stdfu.apply tasks func(v) get(v 'id') end)
+	_ = call(check-tasks-by-id task-ids task-A task-B)
 
 	# Remove tasks
 	_ = call(delete-tasks task-ids)
