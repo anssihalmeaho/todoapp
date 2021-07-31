@@ -59,7 +59,19 @@ delete-tasks = proc(task-ids)
 	call(stdfu.ploop delete-task task-ids 'none')
 end
 
+check-tasks = proc(tasks task-A task-B)
+	task-AR = call(stdfu.filter tasks func(item) eq(get(item 'name') get(task-A 'name')) end):
+	task-BR = call(stdfu.filter tasks func(item) eq(get(item 'name') get(task-B 'name')) end):
+
+	_ = call(verify eq(get(task-AR 'description') get(task-A 'description')) 'invalid task data')
+	_ = call(verify eq(get(task-BR 'description') get(task-B 'description')) 'invalid task data')
+	_ = call(verify eq(get(task-AR 'tags') get(task-A 'tags')) 'invalid task data')
+	_ = call(verify eq(get(task-BR 'tags') list()) 'invalid task data')
+	true
+end
+
 main = proc()
+	# Add two tasks
 	task-A = map(
 		'name'        'A'
 		'description' 'text-A'
@@ -71,10 +83,14 @@ main = proc()
 		'description' 'text-B'
 	)
 	_ = call(add-task task-B)
+
+	# Ask tasks and validate content
 	tasks = call(debugpp 'tasks: ' call(get-tasks))
 	_ = call(verify eq(len(tasks) 2) sprintf('unexpected task count: %d' len(tasks)))
+	_ = call(check-tasks tasks task-A task-B)
 	task-ids = call(stdfu.apply tasks func(v) get(v 'id') end)
 
+	# Remove tasks
 	_ = call(delete-tasks task-ids)
 	tasks2 = call(debugpp 'after delete: ' call(get-tasks))
 	_ = call(verify eq(len(tasks2) 0) sprintf('unexpected task count: %d' len(tasks2)))
