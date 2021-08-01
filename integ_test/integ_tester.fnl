@@ -8,8 +8,9 @@ import stdpr
 import stdfu
 
 # set debug print functions
-debug = call(stdpr.get-pr true)
-debugpp = call(stdpr.get-pp-pr true)
+test-print-on = true
+debug = call(stdpr.get-pr test-print-on)
+debugpp = call(stdpr.get-pp-pr test-print-on)
 
 # Server URL
 port-number = '8003'
@@ -109,15 +110,15 @@ do-testing = proc()
 end
 
 main = proc()
-	_ = call(debug 'test: ' try(call(do-testing)))
+	result = call(debug 'test: ' try(call(do-testing) 'FAILED'))
 
 	# Remove tasks
 	task-ids-to-del = call(stdfu.apply call(get-tasks) func(v) get(v 'id') end)
 	_ = call(delete-tasks task-ids-to-del)
-	tasks2 = call(debugpp 'after delete: ' call(get-tasks))
-	_ = call(verify eq(len(tasks2) 0) sprintf('unexpected task count: %d' len(tasks2)))
+	tasks = call(get-tasks)
+	_ = call(verify eq(len(tasks) 0) sprintf('unexpected task count: %d' len(tasks)))
 
-	'OK'
+	result
 end
 
 endns
