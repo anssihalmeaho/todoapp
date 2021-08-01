@@ -8,7 +8,7 @@ import stdpr
 import stdfu
 
 # set debug print functions
-test-print-on = true
+test-print-on = false
 debug = call(stdpr.get-pr test-print-on)
 debugpp = call(stdpr.get-pp-pr test-print-on)
 
@@ -86,6 +86,26 @@ check-tasks-by-id = proc(task-ids task-A task-B)
 	call(check-tasks tasks task-A task-B)
 end
 
+get-task-by-query-param = proc(query-param)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks?%s' port-number query-param)
+	response = call(stdhttp.do 'GET' server-endpoint map())
+	_ = call(check-response-ok response 200)
+	ok err val = call(stdjson.decode get(response 'body')):
+	_ = call(stddbc.assert ok err)
+	val
+end
+
+modify-task = proc(task-id new-data)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks/%d' port-number task-id)
+	header = map('Content-Type' 'application/json')
+
+	ok err body = call(stdjson.encode new-data):
+
+	_ = call(verify ok err)
+	response = call(stdhttp.do 'POST' server-endpoint header body)
+	call(check-response-ok response 200)
+end
+
 do-testing = proc()
 	# Add two tasks
 	task-A = map(
@@ -106,11 +126,26 @@ do-testing = proc()
 	_ = call(check-tasks tasks task-A task-B)
 	task-ids = call(stdfu.apply tasks func(v) get(v 'id') end)
 	_ = call(check-tasks-by-id task-ids task-A task-B)
+
+	# Modify task
+	b-task-old = head(call(get-task-by-query-param 'name=B'))
+	modif-part = map(
+		'description' 'new-text'
+		'version'     get(b-task-old 'version')
+	)
+	_ = call(modify-task get(b-task-old 'id') modif-part)
+
+	# Ask task with query parameter
+	b-task = head(call(get-task-by-query-param 'name=B'))
+	_ = call(verify eq(get(b-task 'description') 'new-text') 'invalid task data')
+	_ = call(verify eq(get(b-task 'name') 'B') 'invalid task data')
+
 	'OK'
 end
 
 main = proc()
-	result = call(debug 'test: ' try(call(do-testing) 'FAILED'))
+	result = call(debug 'test: ' try(call(do-testing)))
+	_ = call(debug 'result: ' result)
 
 	# Remove tasks
 	task-ids-to-del = call(stdfu.apply call(get-tasks) func(v) get(v 'id') end)
@@ -118,7 +153,10 @@ main = proc()
 	tasks = call(get-tasks)
 	_ = call(verify eq(len(tasks) 0) sprintf('unexpected task count: %d' len(tasks)))
 
-	result
+	case( result
+		'OK' result
+		'FAILED'
+	)
 end
 
 endns
