@@ -106,6 +106,17 @@ modify-task = proc(task-id new-data)
 	call(check-response-ok response 200)
 end
 
+replace-task = proc(task-id new-data)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks/%d' port-number task-id)
+	header = map('Content-Type' 'application/json')
+
+	ok err body = call(stdjson.encode new-data):
+
+	_ = call(verify ok err)
+	response = call(stdhttp.do 'PUT' server-endpoint header body)
+	call(check-response-ok response 200)
+end
+
 do-testing = proc()
 	# Add two tasks
 	task-A = map(
@@ -137,8 +148,27 @@ do-testing = proc()
 
 	# Ask task with query parameter
 	b-task = head(call(get-task-by-query-param 'name=B'))
-	_ = call(verify eq(get(b-task 'description') 'new-text') 'invalid task data')
 	_ = call(verify eq(get(b-task 'name') 'B') 'invalid task data')
+	_ = call(verify eq(get(b-task 'description') 'new-text') 'invalid task data')
+
+	# Replace task
+	b-task-prev = head(call(get-task-by-query-param 'name=B'))
+	new-b-task = map(
+		'id'          get(b-task-prev 'id')
+		'name'        get(b-task-prev 'name')
+		'description' 'text-replaced'
+		'tags'        list('new-tag')
+		'state'       'done'
+		'version'     get(b-task-prev 'version')
+	)
+	_ = call(replace-task get(new-b-task 'id') new-b-task)
+
+	# Ask task with query parameter
+	b-task-2 = head(call(get-task-by-query-param 'name=B'))
+	_ = call(verify eq(get(b-task-2 'name') 'B') 'invalid task data')
+	_ = call(verify eq(get(b-task-2 'description') 'text-replaced') 'invalid task data')
+	_ = call(verify eq(get(b-task-2 'tags') list('new-tag')) 'invalid task data')
+	_ = call(verify eq(get(b-task-2 'state') 'done') 'invalid task data')
 
 	'OK'
 end
