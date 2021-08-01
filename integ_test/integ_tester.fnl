@@ -85,7 +85,7 @@ check-tasks-by-id = proc(task-ids task-A task-B)
 	call(check-tasks tasks task-A task-B)
 end
 
-main = proc()
+do-testing = proc()
 	# Add two tasks
 	task-A = map(
 		'name'        'A'
@@ -105,9 +105,15 @@ main = proc()
 	_ = call(check-tasks tasks task-A task-B)
 	task-ids = call(stdfu.apply tasks func(v) get(v 'id') end)
 	_ = call(check-tasks-by-id task-ids task-A task-B)
+	'OK'
+end
+
+main = proc()
+	_ = call(debug 'test: ' try(call(do-testing)))
 
 	# Remove tasks
-	_ = call(delete-tasks task-ids)
+	task-ids-to-del = call(stdfu.apply call(get-tasks) func(v) get(v 'id') end)
+	_ = call(delete-tasks task-ids-to-del)
 	tasks2 = call(debugpp 'after delete: ' call(get-tasks))
 	_ = call(verify eq(len(tasks2) 0) sprintf('unexpected task count: %d' len(tasks2)))
 
