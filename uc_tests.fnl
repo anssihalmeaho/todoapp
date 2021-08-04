@@ -16,12 +16,14 @@ debugpp = call(stdpr.get-pp-pr is-debug-on)
 new-simulated-store = proc()
 	task-store = call(stdvar.new list())
 
+	# mock implementation for get-values
 	get-values = proc(matcher)
 		tasklist = call(stdvar.value task-store)
 		tasks = call(stdfu.filter tasklist matcher)
 		tasks
 	end
 
+	# mock implementation for take-values
 	take-values = proc(matcher)
 		updator = func(tasks)
 			choose = func(remaining left-list taken-list)
@@ -46,15 +48,38 @@ new-simulated-store = proc()
 		takenlist
 	end
 
+	# mock implementation for update
 	update = proc(matcher)
-		true # to be done...
+		updator = func(tasks)
+			update-items = func(remaining newlist any-change)
+				if( empty(remaining)
+					list(newlist any-change)
+					call(func()
+						next-item = head(remaining)
+						do-update new-value = call(matcher next-item):
+						if( do-update
+							call(update-items rest(remaining) append(newlist new-value) true)
+							call(update-items rest(remaining) append(newlist next-item) any-change)
+						)
+					end)
+				)
+			end
+
+			new-tasks is-any-change = call(update-items tasks list() false):
+			list(new-tasks is-any-change)
+		end
+
+		ok err _ is-any-change = call(stdvar.change-v2 task-store updator):
+		is-any-change
 	end
 
+	# mock implementation for put-value
 	put-value = proc(item)
 		ok err _ = call(stdvar.change task-store func(prev) append(prev item) end):
 		list(ok err)
 	end
 
+	# return mock store-object
 	store-object = map(
 		'get-values'  get-values
 		'take-values' take-values
@@ -70,6 +95,7 @@ main = proc()
 	task-adder = call(uc.new-task-adder store)
 	task-getter = call(uc.new-task-getter store)
 	task-deleter = call(uc.new-task-deleter store)
+	task-modifier = call(uc.new-task-modifier store)
 
 	_ = print('first: '
 		call(task-getter
@@ -110,7 +136,7 @@ main = proc()
 
 	msg3 = map(
 		'name'  'task-C'
-		'state' 'done'
+		'state' 'ongoing'
 	)
 	_ = print('put: '
 		call(task-adder
@@ -131,8 +157,16 @@ main = proc()
 	_ = call(debugpp 'delete: '
 		call(task-deleter
 			map()
-			map('query-map' map() 'selected-id' 103)
+			map('query-map' map() 'selected-id' 102)
 			map()
+		)
+	)
+
+	_ = call(debugpp 'modify: '
+		call(task-modifier
+			map()
+			map('query-map' map() 'selected-id' 103)
+			map('version' 'v1' 'state' 'done' 'description' 'Huraa !!!')
 		)
 	)
 
