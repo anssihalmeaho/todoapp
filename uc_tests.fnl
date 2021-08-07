@@ -2,11 +2,12 @@
 ns main
 
 import uc
+import er
 
 import stdvar
 import stdfu
-
 import stdpr
+import stddbc
 
 # set debug print functions
 is-debug-on = true
@@ -89,6 +90,154 @@ new-simulated-store = proc()
 	store-object
 end
 
+# --- test task adding ok
+test-add-task-ok = proc()
+	store = call(new-simulated-store)
+
+	task-adder = call(uc.new-task-adder store)
+	task-getter = call(uc.new-task-getter store)
+
+	task-id-var = call(stdvar.new 100)
+	ctx = map(
+		'task-id-var' task-id-var
+	)
+	msg = map(
+		'name'  'task-A'
+		'state' 'done'
+	)
+
+	status err val = call(task-adder ctx map() msg):
+
+	_ = call(stddbc.assert eq(er.No-Error status) sprintf('task adding failed: %s (%d)' err status))
+
+	tasklist = call(task-getter map() map('query-map' map()) map())
+	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
+
+	task = head(tasklist)
+	_ = call(stddbc.assert eq(get(task 'name') 'task-A') sprintf('unexpected task: %v' task))
+	_ = call(stddbc.assert eq(get(task 'state') 'done') sprintf('unexpected task: %v' task))
+	_ = call(stddbc.assert eq(get(task 'id') 101) sprintf('wrong id: %v' task))
+	_ = call(stddbc.assert eq(get(task 'version') 'v1') sprintf('wrong version: %v' task))
+	true
+end
+
+# --- test task adding fails as id -field not allowed
+test-add-task-fail-id-not-allowed = proc()
+	store = call(new-simulated-store)
+
+	task-adder = call(uc.new-task-adder store)
+	task-getter = call(uc.new-task-getter store)
+
+	task-id-var = call(stdvar.new 100)
+	ctx = map(
+		'task-id-var' task-id-var
+	)
+	msg = map(
+		'name'  'task-A'
+		'state' 'done'
+		'id'    100
+	)
+
+	status err val = call(task-adder ctx map() msg):
+
+	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
+	_ = call(stddbc.assert eq('id not allowed in task when new task added' err) sprintf('unexpected err: %s (%d)' err status))
+
+	tasklist = call(task-getter map() map('query-map' map()) map())
+	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
+
+	true
+end
+
+# --- test task adding fails as name is missing (invalid task data)
+test-add-task-fail-invalid-task-data = proc()
+	store = call(new-simulated-store)
+
+	task-adder = call(uc.new-task-adder store)
+	task-getter = call(uc.new-task-getter store)
+
+	task-id-var = call(stdvar.new 100)
+	ctx = map(
+		'task-id-var' task-id-var
+	)
+	msg = map(
+		'state' 'done'
+	)
+
+	status err val = call(task-adder ctx map() msg):
+
+	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
+	_ = call(stddbc.assert eq('invalid task: required field name not found ()' err) sprintf('unexpected err: %s (%d)' err status))
+
+	tasklist = call(task-getter map() map('query-map' map()) map())
+	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
+
+	true
+end
+
+# --- test task adding fails in store
+test-add-task-fail-in-store = proc()
+	failing-put-value = proc(item)
+		list(false 'fake error')
+	end
+
+	store = put(del(call(new-simulated-store) 'put-value') 'put-value' failing-put-value)
+
+	task-adder = call(uc.new-task-adder store)
+	task-getter = call(uc.new-task-getter store)
+
+	task-id-var = call(stdvar.new 100)
+	ctx = map(
+		'task-id-var' task-id-var
+	)
+	msg = map(
+		'name'  'task-A'
+		'state' 'done'
+	)
+
+	status err val = call(task-adder ctx map() msg):
+
+	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
+	_ = call(stddbc.assert eq('adding task failed: fake error' err) sprintf('unexpected err: %s (%d)' err status))
+
+	tasklist = call(task-getter map() map('query-map' map()) map())
+	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
+
+	true
+end
+
+main = proc()
+	tests = list(
+		test-add-task-ok
+		test-add-task-fail-id-not-allowed
+		test-add-task-fail-in-store
+		test-add-task-fail-invalid-task-data
+	)
+
+	test-runner = proc(tst-proc)
+		res = try(call(tst-proc))
+		test-result = cond(
+			eq(type(res) 'string') false
+			res
+		)
+		_ = if(test-result
+			print('PASS: ' tst-proc)
+			print('FAIL: ' tst-proc '\n' res)
+		)
+		test-result
+	end
+
+	tp-list = call(stdfu.proc-apply tests proc(tp) proc() call(test-runner tp) end end)
+	all-tests-ok = call(stdfu.ploop proc(tp prev-res) and(call(tp) prev-res) end tp-list true)
+
+	result = if( all-tests-ok
+		'PASS'
+		'FAILED'
+	)
+	result
+end
+
+/*
 main = proc()
 	store = call(new-simulated-store)
 
@@ -180,6 +329,6 @@ main = proc()
 
 	'done'
 end
-
+*/
 endns
 
