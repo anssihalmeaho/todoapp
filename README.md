@@ -408,3 +408,48 @@ https://programmingfunl.wordpress.com/2021/04/19/using-funl-as-functional-core-e
 ![](https://github.com/anssihalmeaho/todoapp/blob/main/todo_arch.png)
 
 
+### Unit testing use case layer (uc)
+
+Unit testing of **uc** (and **domain** consequently) is based on replacing **todoapp.fnl** with
+**uc_tests.fnl** as **main** module.
+
+#### Executing uc unit tests
+
+FunL interpreter (**funla**) is used for unit testing.
+
+Create **funla** executable for FunL interpreter if not done already:
+https://github.com/anssihalmeaho/funl
+
+Run unit tests with **funla** interpreter, like:`funla ./uc_tests.fnl`
+
+If all tests are passed output is following kind:
+
+```
+PASS: func-value: file: uc_tests.fnl line: 94 pos: 24
+PASS: func-value: file: uc_tests.fnl line: 124 pos: 41
+PASS: func-value: file: uc_tests.fnl line: 178 pos: 35
+PASS: func-value: file: uc_tests.fnl line: 152 pos: 44
+PASS: func-value: file: uc_tests.fnl line: 209 pos: 27
+PASS: func-value: file: uc_tests.fnl line: 246 pos: 46
+PASS: func-value: file: uc_tests.fnl line: 284 pos: 28
+PASS: func-value: file: uc_tests.fnl line: 333 pos: 47
+PASS: func-value: file: uc_tests.fnl line: 384 pos: 27
+PASS: func-value: file: uc_tests.fnl line: 415 pos: 27
+PASS: func-value: file: uc_tests.fnl line: 460 pos: 30
+'PASS'
+```
+
+#### Unit test architecture
+
+Tester (**uc_tests.fnl**) runs procedures which tests **uc**.
+Each testing procedure creates simulated store-object which is
+given as argument in **uc** procedure creation.
+
+Simulated store-object implements similar interface (map) as in
+real implementation but implementation is based on in-memory data structure
+(list wrapped inside **stdvar** **var-ref**).
+
+Here's picture of unit test architecture:
+
+![](https://github.com/anssihalmeaho/todoapp/blob/main/uc_test_arch.png)
+
