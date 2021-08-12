@@ -456,7 +456,7 @@ test-get-task-by-id = proc()
 	true
 end
 
-# --- test task getting with id ok
+# --- test task getting with query parameter ok
 test-get-task-by-query = proc()
 	store = call(new-simulated-store)
 
@@ -504,6 +504,59 @@ test-get-task-by-query = proc()
 	)
 end
 
+# --- test task getting with query parameter (search) for text search
+test-get-task-by-text-search = proc()
+	store = call(new-simulated-store)
+
+	task-adder = call(uc.new-task-adder store)
+	task-getter = call(uc.new-task-getter store)
+
+	task-id-var = call(stdvar.new 100)
+	ctx = map('task-id-var' task-id-var)
+
+	tasks = list(
+		map(
+			'name'  'Carwash'
+			'description' 'Washing car'
+		)
+		map(
+			'name'  'Garage'
+			'description' 'Clean the garage'
+		)
+		map(
+			'name'  'Shopping'
+			'description' 'Drive with car to do shopping'
+		)
+	)
+	_ = call(stdfu.ploop proc(task _) call(task-adder ctx map() task) end tasks 'none')
+
+	check-names = proc(tasklist expect-names)
+		_ = call(stddbc.assert eq(len(tasklist) len(expect-names)) sprintf('unexpected tasks: %v' tasklist))
+		namelist = call(stdfu.apply tasklist func(task) get(task 'name') end)
+		_ = call(stddbc.assert eq(len(namelist) len(expect-names)) sprintf('list len dont match: %v' tasklist))
+		names-ok = call(stdfu.applies-for-all expect-names func(tn) in(namelist tn) end)
+		_ = call(stddbc.assert names-ok sprintf('names dont match: %v' namelist))
+		true
+	end
+
+	do-get = proc(search-list)
+		call(task-getter
+			map()
+			map('query-map' map('search' search-list))
+			map()
+		)
+	end
+	# search one string which occurs in two tasks
+	_ = call(check-names call(do-get list('car')) list('Shopping' 'Carwash'))
+
+	# no search string given -> empty result list
+	_ = call(check-names call(do-get list()) list())
+
+	# search two strings
+	_ = call(check-names call(do-get list('Car' 'garage')) list('Carwash' 'Garage'))
+	true
+end
+
 main = proc()
 	tests = list(
 		test-add-task-ok
@@ -521,6 +574,8 @@ main = proc()
 
 		test-get-task-by-id
 		test-get-task-by-query
+
+		test-get-task-by-text-search
 	)
 
 	test-runner = proc(tst-proc)

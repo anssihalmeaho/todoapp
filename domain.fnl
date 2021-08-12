@@ -53,7 +53,7 @@ task-id-match = func(selected-id)
 end
 
 get-query-names = func()
-	list('name' 'tags' 'state')
+	list('name' 'tags' 'state' 'search')
 end
 
 get-query-func = func(query-map)
@@ -62,6 +62,8 @@ get-query-func = func(query-map)
 	has-tags tag-list = getl(query-map 'tags'):
 	has-state state-list = getl(query-map 'state'):
 	has-name name-list = getl(query-map 'name'):
+
+	has-search search-list = getl(query-map 'search'):
 
 	get-cut = func(l1 l2)
 		import stdset
@@ -87,13 +89,39 @@ get-query-func = func(query-map)
 		)
 	end
 
-	func(task)
-		and(
-			call(qcheck task 'tags' has-tags tag-list true)
-			call(qcheck task 'state' has-state state-list false)
-			call(qcheck task 'name' has-name name-list false)
-		)
+	is-text-found-in-task = func(task search-text)
+		to-one-str = func(val)
+			next-val = func(nval result-str)
+				case( type(nval)
+					'string' plus(result-str nval)
+					'list'   plus(result-str call(stdfu.loop func(x cum) call(next-val x cum) end nval '') )
+					'map'    plus(result-str call(stdfu.loop func(x cum) call(next-val x cum) end vals(nval) '') )
+					result-str
+				)
+			end
+
+			call(next-val val '')
+		end
+
+		in(call(to-one-str task) search-text)
 	end
+
+	if( has-search
+		func(task)
+			if( empty(search-list)
+				false
+				call(stdfu.applies-for-any search-list func(search-text) call(is-text-found-in-task task search-text) end)
+			)
+		end
+
+		func(task)
+			and(
+				call(qcheck task 'tags' has-tags tag-list true)
+				call(qcheck task 'state' has-state state-list false)
+				call(qcheck task 'name' has-name name-list false)
+			)
+		end
+	)
 end
 
 interleave-fields = func(old-item new-item)
