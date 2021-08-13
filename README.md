@@ -335,6 +335,39 @@ curl 'http://localhost:8003/todoapp/v1/tasks?tags=yard,car&state=new&name=lawn%2
 }]
 ```
 
+#### Text search
+
+Textual task fields can be searched for certain text by giving texts to search with **search** -query parameter.
+Note that this query parameter is exclusive with other ones.
+
+Example: Get all tasks which have text "car" or "lawn":
+
+```
+curl http://localhost:8003/todoapp/v1/tasks?search=car,lawn
+
+[
+    {
+        "description": "go to washing car",
+        "id": 11,
+        "name": "wash car",
+        "state": "new",
+        "tags": [
+            "car"
+        ],
+        "version": "v1"
+    },
+    {
+        "description": "mowe the lawn",
+        "id": 12,
+        "name": "lawn mowing",
+        "state": "new",
+        "tags": [],
+        "version": "v1"
+    }
+]
+```
+
+
 ## Port number
 
 By default **todoapp** is using port number **8003**.
