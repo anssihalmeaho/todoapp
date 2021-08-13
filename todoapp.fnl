@@ -71,26 +71,26 @@ main = proc()
 		'POST' list(
 				list(
 					list('todoapp' 'v1' 'tasks')
-					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-adder store) http.put-created))
+					call(http.create-middle call(http.create-item-writer call(uc.new-task-adder store task-id-var) http.put-created))
 				)
 
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-modifier store) proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer call(uc.new-task-modifier store) proc(w) 'ok' end))
 				)
 			)
 
 		'DELETE' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-deleter store) proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer call(uc.new-task-deleter store) proc(w) 'ok' end))
 				)
 			)
 
 		'PUT' list(
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
-					call(http.create-middle call(http.create-item-writer task-id-var call(uc.new-task-replacer store) proc(w) 'ok' end))
+					call(http.create-middle call(http.create-item-writer call(uc.new-task-replacer store) proc(w) 'ok' end))
 				)
 			)
 	)

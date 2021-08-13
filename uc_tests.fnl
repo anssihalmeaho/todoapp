@@ -3,6 +3,7 @@ ns main
 
 import uc
 import er
+import domain
 
 import stdvar
 import stdfu
@@ -93,23 +94,20 @@ end
 # --- test task adding ok
 test-add-task-ok = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
 
-	status err val = call(task-adder ctx map() msg):
+	status err val = call(task-adder map() msg):
 	_ = call(stddbc.assert eq(er.No-Error status) sprintf('task adding failed: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -123,26 +121,23 @@ end
 # --- test task adding fails as id -field not allowed
 test-add-task-fail-id-not-allowed = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 		'id'    100
 	)
 
-	status err val = call(task-adder ctx map() msg):
+	status err val = call(task-adder map() msg):
 
 	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
 	_ = call(stddbc.assert eq('id not allowed in task when new task added' err) sprintf('unexpected err: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
 
 	true
@@ -151,24 +146,21 @@ end
 # --- test task adding fails as name is missing (invalid task data)
 test-add-task-fail-invalid-task-data = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'state' 'done'
 	)
 
-	status err val = call(task-adder ctx map() msg):
+	status err val = call(task-adder map() msg):
 
 	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
 	_ = call(stddbc.assert eq('invalid task: required field name not found ()' err) sprintf('unexpected err: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
 
 	true
@@ -181,25 +173,22 @@ test-add-task-fail-in-store = proc()
 	end
 
 	store = put(del(call(new-simulated-store) 'put-value') 'put-value' failing-put-value)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
 
-	status err val = call(task-adder ctx map() msg):
+	status err val = call(task-adder map() msg):
 
 	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task adding should fail: %s (%d)' err status))
 	_ = call(stddbc.assert eq('adding task failed: fake error' err) sprintf('unexpected err: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
 
 	true
@@ -208,29 +197,25 @@ end
 # --- test task modify ok
 test-modify-task-ok = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 	task-modifier = call(uc.new-task-modifier store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
-	_ = call(task-adder ctx map() msg)
+	_ = call(task-adder map() msg)
 
 	status err _ = call(task-modifier
-		map()
 		map('query-map' map() 'selected-id' 101)
 		map('version' 'v1' 'state' 'ongoing' 'description' 'Huraa !!!')
 	):
 	_ = call(stddbc.assert eq(er.No-Error status) sprintf('task modify failed: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -245,30 +230,26 @@ end
 # --- test task modify fails as wrong version is given
 test-modify-task-fail-as-wrong-version = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 	task-modifier = call(uc.new-task-modifier store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
-	_ = call(task-adder ctx map() msg)
+	_ = call(task-adder map() msg)
 
 	status err _ = call(task-modifier
-		map()
 		map('query-map' map() 'selected-id' 101)
 		map('version' 'v10' 'state' 'ongoing' 'description' 'Huraa !!!')
 	):
 	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task modify, unexpected status: %s (%d)' err status))
 
 	# lets check that nothing has changed
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -283,22 +264,19 @@ end
 # --- test task replace ok
 test-replace-task-ok = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 	task-replacer = call(uc.new-task-replacer store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
-	_ = call(task-adder ctx map() msg)
+	_ = call(task-adder map() msg)
 
-	task-prev = head(call(task-getter map() map('query-map' map()) map()))
+	task-prev = head(call(task-getter map('query-map' map()) map()))
 
 	new-task = map(
 		'id'          get(task-prev 'id')
@@ -310,13 +288,12 @@ test-replace-task-ok = proc()
 	)
 
 	status err _ = call(task-replacer
-		map()
 		map('query-map' map() 'selected-id' 101)
 		new-task
 	):
 	_ = call(stddbc.assert eq(er.No-Error status) sprintf('task replace failed: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -332,22 +309,19 @@ end
 # --- test task replace fails as wrong version is given
 test-replace-task-fail-as-wrong-version = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 	task-replacer = call(uc.new-task-replacer store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
-	_ = call(task-adder ctx map() msg)
+	_ = call(task-adder map() msg)
 
-	task-prev = head(call(task-getter map() map('query-map' map()) map()))
+	task-prev = head(call(task-getter map('query-map' map()) map()))
 
 	new-task = map(
 		'id'          get(task-prev 'id')
@@ -359,14 +333,13 @@ test-replace-task-fail-as-wrong-version = proc()
 	)
 
 	status err _ = call(task-replacer
-		map()
 		map('query-map' map() 'selected-id' 101)
 		new-task
 	):
 	_ = call(stddbc.assert eq(er.Invalid-Request status) sprintf('task replace, unexpected status: %s (%d)' err status))
 
 	# lets check that nothing has changed
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -383,29 +356,25 @@ end
 # --- test task deletion ok
 test-delete-task-ok = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 	task-deleter = call(uc.new-task-deleter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map(
-		'task-id-var' task-id-var
-	)
 	msg = map(
 		'name'  'task-A'
 		'state' 'done'
 	)
-	_ = call(task-adder ctx map() msg)
+	_ = call(task-adder map() msg)
 
 	status err _ = call(task-deleter
-		map()
 		map('query-map' map() 'selected-id' 101)
 		map()
 	):
 	_ = call(stddbc.assert eq(er.No-Error status) sprintf('task modify failed: %s (%d)' err status))
 
-	tasklist = call(task-getter map() map('query-map' map()) map())
+	tasklist = call(task-getter map('query-map' map()) map())
 	_ = call(stddbc.assert empty(tasklist) sprintf('unexpected tasks: %v' tasklist))
 
 	true
@@ -414,32 +383,28 @@ end
 # --- test task getting with id ok
 test-get-task-by-id = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter-by-id = call(uc.new-task-getter-by-id store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map('task-id-var' task-id-var)
-
-	msg1 = map(
-		'name'  'task-A'
-		'state' 'new'
+	tasks = list(
+		map(
+			'name'  'task-A'
+			'state' 'new'
+		)
+		map(
+			'name'  'task-B'
+			'state' 'ongoing'
+		)
+		map(
+			'name'  'task-C'
+			'state' 'done'
+		)
 	)
-	_ = call(task-adder ctx map() msg1)
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end tasks 'none')
 
-	msg2 = map(
-		'name'  'task-B'
-		'state' 'ongoing'
-	)
-	_ = call(task-adder ctx map() msg2)
-
-	msg3 = map(
-		'name'  'task-C'
-		'state' 'done'
-	)
-	_ = call(task-adder ctx map() msg3)
-
-	tasklist = call(task-getter-by-id map() map('selected-id' 102) map())
+	tasklist = call(task-getter-by-id map('selected-id' 102) map())
 	_ = call(stddbc.assert eq(len(tasklist) 1) sprintf('unexpected tasks: %v' tasklist))
 
 	task = head(tasklist)
@@ -450,7 +415,7 @@ test-get-task-by-id = proc()
 	_ = call(stddbc.assert eq(get(task 'version') 'v1') sprintf('wrong version: %v' task))
 
 	# test also by giving non existing id
-	tasklist2 = call(task-getter-by-id map() map('selected-id' 1234) map())
+	tasklist2 = call(task-getter-by-id map('selected-id' 1234) map())
 	_ = call(stddbc.assert empty(tasklist2) sprintf('should be empty: %v' tasklist))
 
 	true
@@ -459,33 +424,28 @@ end
 # --- test task getting with query parameter ok
 test-get-task-by-query = proc()
 	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
 
-	task-adder = call(uc.new-task-adder store)
+	task-adder = call(uc.new-task-adder store task-id-var)
 	task-getter = call(uc.new-task-getter store)
 
-	task-id-var = call(stdvar.new 100)
-	ctx = map('task-id-var' task-id-var)
-
-	msg1 = map(
-		'name'  'task-A'
-		'state' 'new'
+	tasks = list(
+		map(
+			'name'  'task-A'
+			'state' 'new'
+		)
+		map(
+			'name'  'task-B'
+			'state' 'ongoing'
+		)
+		map(
+			'name'  'task-C'
+			'state' 'done'
+		)
 	)
-	_ = call(task-adder ctx map() msg1)
-
-	msg2 = map(
-		'name'  'task-B'
-		'state' 'ongoing'
-	)
-	_ = call(task-adder ctx map() msg2)
-
-	msg3 = map(
-		'name'  'task-C'
-		'state' 'done'
-	)
-	_ = call(task-adder ctx map() msg3)
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end tasks 'none')
 
 	tasklist = call(task-getter
-		map()
 		map('query-map' map('state' list('ongoing' 'new')))
 		map()
 	)
@@ -507,12 +467,10 @@ end
 # --- test task getting with query parameter (search) for text search
 test-get-task-by-text-search = proc()
 	store = call(new-simulated-store)
-
-	task-adder = call(uc.new-task-adder store)
-	task-getter = call(uc.new-task-getter store)
-
 	task-id-var = call(stdvar.new 100)
-	ctx = map('task-id-var' task-id-var)
+
+	task-adder = call(uc.new-task-adder store task-id-var)
+	task-getter = call(uc.new-task-getter store)
 
 	tasks = list(
 		map(
@@ -528,7 +486,7 @@ test-get-task-by-text-search = proc()
 			'description' 'Drive with car to do shopping'
 		)
 	)
-	_ = call(stdfu.ploop proc(task _) call(task-adder ctx map() task) end tasks 'none')
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end tasks 'none')
 
 	check-names = proc(tasklist expect-names)
 		_ = call(stddbc.assert eq(len(tasklist) len(expect-names)) sprintf('unexpected tasks: %v' tasklist))
@@ -541,7 +499,6 @@ test-get-task-by-text-search = proc()
 
 	do-get = proc(search-list)
 		call(task-getter
-			map()
 			map('query-map' map('search' search-list))
 			map()
 		)
@@ -558,7 +515,7 @@ test-get-task-by-text-search = proc()
 end
 
 main = proc()
-	tests = list(
+	tests-uc = list(
 		test-add-task-ok
 		test-add-task-fail-id-not-allowed
 		test-add-task-fail-in-store
@@ -577,6 +534,7 @@ main = proc()
 
 		test-get-task-by-text-search
 	)
+	tests = extend(tests-uc call(domain.get-testcases))
 
 	test-runner = proc(tst-proc)
 		res = try(call(tst-proc))

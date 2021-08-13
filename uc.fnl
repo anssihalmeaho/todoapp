@@ -41,7 +41,7 @@ end
 new-task-getter = proc(store)
 	get-values = get(store 'get-values')
 
-	proc(ctx req msg)
+	proc(req msg)
 		query-map = get(req 'query-map')
 		query-func = call(domain.get-query-func query-map)
 		matched-items = call(get-values func(item) call(query-func item) end)
@@ -52,7 +52,7 @@ end
 new-task-getter-by-id = proc(store)
 	get-values = get(store 'get-values')
 
-	proc(ctx req msg)
+	proc(req msg)
 		selected-id = get(req 'selected-id')
 		matched-items = call(get-values call(domain.task-id-match selected-id))
 		matched-items
@@ -62,7 +62,7 @@ end
 new-task-deleter = proc(store)
 	take-values = get(store 'take-values')
 
-	proc(ctx req msg)
+	proc(req msg)
 		selected-id = get(req 'selected-id')
 		taken-items = call(take-values call(domain.task-id-match selected-id))
 		case( len(taken-items)
@@ -75,7 +75,7 @@ end
 new-task-replacer = proc(store)
 	update = get(store 'update')
 
-	proc(ctx req msg)
+	proc(req msg)
 		selected-id = get(req 'selected-id')
 		has-id idvalue = getl(msg 'id'):
 		has-version version = getl(msg 'version'):
@@ -126,7 +126,7 @@ end
 new-task-modifier = proc(store)
 	update = get(store 'update')
 
-	proc(ctx req msg)
+	proc(req msg)
 		selected-id = get(req 'selected-id')
 		has-version version = getl(msg 'version'):
 		check-ok err-text = call(is-valid-version has-version version):
@@ -174,11 +174,10 @@ new-task-modifier = proc(store)
 	end
 end
 
-new-task-adder = proc(store)
+new-task-adder = proc(store task-id-var)
 	put-value = get(store 'put-value')
 
-	proc(ctx req msg)
-		task-id-var = get(ctx 'task-id-var')
+	proc(req msg)
 		has-id idvalue = getl(msg 'id'):
 		item = call(domain.fill-missing-fields msg)
 		is-valid err-text = call(call(domain.get-task-validator item)):

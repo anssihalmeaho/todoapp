@@ -79,7 +79,6 @@ create-items-reader = func(uc-handler query-names-getter)
 		call(debug 'trying: ' try(call(proc()
 
 		req = call(get-task-id-if-found params map())
-		ctx = map()
 
 		# query parameters are really not for case when id is given
 		query-params = call(debug 'query: ' get(r 'query'))
@@ -88,7 +87,7 @@ create-items-reader = func(uc-handler query-names-getter)
 
 		req2 = put(req 'query-map' query-map)
 
-		items = call(uc-handler ctx req2 map())
+		items = call(uc-handler req2 map())
 
 		_ = call(stdhttp.add-response-header w map('Content-Type' 'application/json'))
 		_ _ response = call(stdjson.encode items):
@@ -119,7 +118,7 @@ get-task-id-if-found = func(params inmap)
 	)
 end
 
-create-item-writer = func(task-id-var uc-handler ok-writer)
+create-item-writer = func(uc-handler ok-writer)
 	proc(w r params)
 		req = call(get-task-id-if-found params map())
 		body-found body = getl(r 'body'):
@@ -134,8 +133,7 @@ create-item-writer = func(task-id-var uc-handler ok-writer)
 
 		if( decode-ok
 			call(proc()
-				ctx = map('task-id-var' task-id-var)
-				code err resp = call(uc-handler ctx req item):
+				code err resp = call(uc-handler req item):
 				http-code = case( code
 					er.Invalid-Request Status-Bad-Request
 					Status-Bad-Request

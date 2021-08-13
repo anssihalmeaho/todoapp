@@ -134,60 +134,134 @@ interleave-fields = func(old-item new-item)
 	call(stdfu.merge conflict-solver old-item new-item)
 end
 
-#===================== tests ====
-
-test-interl = proc()
-	mold = map('a' 1 'b' 2)
-	mnew = map('b' 3 'a' 4 'c' 5)
-
-	call(interleave-fields mold mnew)
-end
-
-test-q-all = proc()
+# --- test cases
+get-testcases = func()
 	import stdfu
 	import stdpp
 
-	tclist = list(
-		test-q-1
-		test-q-2
-	)
-	call(stdpp.pform call(stdfu.proc-apply tclist proc(tc) call(tc) end))
-end
+	test-interleave = func()
+		mold = map('a' 1 'b' 2)
+		mnew = map('b' 3 'a' 4 'c' 5)
 
-test-q-2 = proc()
-	task = map(
-		'name'  'Dum'
-		'tags'  list('tag1' 'tag2')
-		'state' 'new'
-	)
+		eq(
+			call(interleave-fields mold mnew)
+			map('c' 5 'b' 3 'a' 4)
+		)
+	end
 
-	qm = map(
-		'tags'  list('tag2')
-		'name'  list('Dum')
-		'state' list('new' 'done')
-	)
+	test-queries = func()
+		task = map(
+			'name'  'Dum'
+			'tags'  list('tag1' 'tag2')
+			'state' 'new'
+		)
 
-	f = call(get-query-func qm)
-	case( call(f task)
-		true  'PASSED'
-		false 'FAILED'
-	)
-end
+		qm = map(
+			'tags'  list('tag2')
+			'name'  list('Dum')
+			'state' list('new' 'done')
+		)
 
-test-q-1 = proc()
-	task = map(
-		'name' 'Dummy'
-		'tags' list('tag1' 'tag2')
-	)
+		f = call(get-query-func qm)
+		call(f task)
+	end
 
-	qm = map(
-		'tags'  list('t1', 'tag1', 't3')
-	)
+	test-query-tags = func()
+		task = map(
+			'name' 'Dummy'
+			'tags' list('tag1' 'tag2')
+		)
 
-	f = call(get-query-func qm)
-	case( call(f task)
-		true  'PASSED'
-		false 'FAILED'
+		querymap = map(
+			'tags'  list('t1', 'tag1', 't3')
+		)
+
+		f = call(get-query-func querymap)
+		call(f task)
+	end
+
+	test-filling-missing-fields = func()
+		draft-task = map(
+			'name' 'Some Name'
+		)
+		expected-task = map(
+			'name'        'Some Name'
+			'description' ''
+			'state'       'new'
+			'tags'        list()
+		)
+		result-task = call(fill-missing-fields draft-task)
+
+		eq(expected-task result-task)
+	end
+
+	test-validations = func()
+		tasks = list(
+			map(
+				'name' 123
+				'description' '...'
+				'state'       'done'
+				'tags'        list()
+			)
+			map(
+				'description' '...'
+				'state'       'done'
+				'tags'        list()
+			)
+			map(
+				'name'        'Some Name'
+				'description' '...'
+				'state'       'done'
+				'tags'        'this should be list'
+			)
+			map(
+				'name'        'Some Name'
+				'description' '...'
+				'state'       'not valid state'
+				'tags'        list('tag1' 'tag2')
+			)
+			map(
+				'name'        'Some Name'
+				'description' '...'
+				'state'       'ongoing'
+				'tags'        list('tag1' 'tag2')
+			)
+		)
+		results = call(stdfu.loop func(task cum) append(cum call(call(get-task-validator task))) end tasks list())
+		#_ = print('\nresults: ' call(stdpp.form results) '\n')
+
+		expected = list(
+			list(
+					false
+					'field name is not required type (got: int, expected: string)()'
+			)
+			list(
+					false
+					'required field name not found ()'
+			)
+			list(
+					false
+					'field tags is not required type (got: string, expected: list)()'
+			)
+			list(
+					false
+					'field state is not in allowed set (not valid state not in: list(\'new\', \'ongoing\', \'done\'))()'
+			)
+			list(
+					true
+					''
+			)
+		)
+
+		eq(results expected)
+	end
+
+	list(
+		test-query-tags
+		test-queries
+		test-interleave
+		test-filling-missing-fields
+		test-validations
 	)
 end
 
