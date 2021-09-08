@@ -174,6 +174,78 @@ new-task-modifier = proc(store)
 	end
 end
 
+new-tasks-importer = proc(store task-id-var)
+	import stdfu
+
+	proc(req msg)
+		importer = proc(txn)
+			put-value = get(txn 'put-value')
+			take-values = get(txn 'take-values')
+			get-values = get(txn 'get-values')
+
+			put-one-task = proc(item result)
+				if( result
+					call(proc()
+						_ _ next-id-val = call(stdvar.change task-id-var func(x) plus(x 1) end):
+						task = if(in(item 'id') del(item 'id') item)
+
+						added-ok _ = call(put-value put(task 'id' next-id-val)):
+						added-ok
+					end)
+
+					false
+				)
+			end
+
+			# lets delete all current tasks first
+			_ = call(take-values func() true end)
+
+			# then add imported tasks one by one
+			call(stdfu.ploop put-one-task msg true)
+		end
+
+		validate-one-task = func(item resultlist)
+			has-version = in(item 'version')
+			is-valid err-text = call(call(domain.get-task-validator item)):
+
+			cond(
+				not(has-version) append(resultlist list(er.Invalid-Request 'task does not have version' ''))
+				not(is-valid)    append(resultlist list(er.Invalid-Request sprintf('invalid task: %s' err-text) ''))
+				append(resultlist list(er.No-Error '' ''))
+			)
+		end
+
+		choose-result = func(results-list)
+			errors = call(stdfu.filter results-list func(res) not(eq(head(res) er.No-Error)) end)
+			if( empty(errors)
+				head(results-list)
+				head(errors)
+			)
+		end
+
+		cond(
+			not(eq(type(msg) 'list')) list(er.Invalid-Request sprintf('request should contain list (was: %s)' type(msg)) '')
+			empty(msg)                list(er.Invalid-Request 'no tasks to import' '')
+
+			call(proc()
+				validity-result = call(choose-result call(stdfu.loop validate-one-task msg list()))
+				if( eq(head(validity-result) er.No-Error)
+					call(proc()
+						trans = get(store 'trans')
+						changes-done = call(trans importer)
+						if( changes-done
+							list(er.No-Error '' '')
+							list(er.Invalid-Request 'import storing failed' '')
+						)
+					end)
+
+					validity-result
+				)
+			end)
+		)
+	end
+end
+
 new-task-adder = proc(store task-id-var)
 	put-value = get(store 'put-value')
 

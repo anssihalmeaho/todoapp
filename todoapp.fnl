@@ -37,11 +37,26 @@ new-store = proc()
 		10
 	)
 
+	trans = proc(txn-proc)
+		middle-txn-handler = proc(txn)
+			txn-object = map(
+				'get-values'  proc(matcher) call(valuez.get-values txn matcher) end
+				'take-values' proc(matcher) call(valuez.take-values txn matcher) end
+				'update'      proc(matcher) call(valuez.update txn matcher) end
+				'put-value'   proc(item) call(valuez.put-value txn item) end
+			)
+			call(txn-proc txn-object)
+		end
+
+		call(valuez.trans col middle-txn-handler)
+	end
+
 	store-object = map(
 		'get-values'  proc(matcher) call(valuez.get-values col matcher) end
 		'take-values' proc(matcher) call(valuez.take-values col matcher) end
 		'update'      proc(matcher) call(valuez.update col matcher) end
 		'put-value'   proc(item) call(valuez.put-value col item) end
+		'trans'       trans
 	)
 
 	list(store-object biggest-id proc() call(valuez.close db) end)
@@ -77,6 +92,11 @@ main = proc()
 				list(
 					list('todoapp' 'v1' 'tasks' ':id')
 					call(http.create-middle call(http.create-item-writer call(uc.new-task-modifier store) proc(w) 'ok' end))
+				)
+
+				list(
+					list('todoapp' 'v1' 'import' 'tasks')
+					call(http.create-middle call(http.create-item-writer call(uc.new-tasks-importer store task-id-var) http.put-created))
 				)
 			)
 

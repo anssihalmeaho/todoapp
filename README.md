@@ -184,6 +184,32 @@ Example:
 curl -v -X DELETE http://localhost:8003/todoapp/v1/tasks/11
 ```
 
+### Importing tasks: POST /todoapp/v1/import/tasks
+
+Imports all given tasks in request body. Importing means:
+
+* Existing tasks are removed
+* Tasks given in request are added
+
+Importing is done as transaction so that if any given task content
+is invalid or updating fails then nothing is updated but existing
+tasks remain.
+
+Tasks given in request body are in similar format as in response
+to read tasks so importing can be used as taking backup of tasks
+and restoring those by importing backup tasks.
+
+All other fields in tasks are stored as given but **'id'** is
+replaced with new value.
+In addition to normal task data validations it's also checked that
+task has **'version'** -field.
+
+HTTP status code in response is:
+
+* 201 if succeeded
+* 400 in case data is invalid in request
+
+
 ### Reading task: GET /todoapp/v1/tasks/:id
 
 Reading task with id.

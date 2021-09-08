@@ -9,6 +9,7 @@ import stdvar
 import stdfu
 import stdpr
 import stddbc
+import stdsort
 
 # set debug print functions
 is-debug-on = true
@@ -19,74 +20,100 @@ new-simulated-store = proc()
 	task-store = call(stdvar.new list())
 
 	# mock implementation for get-values
-	get-values = proc(matcher)
-		tasklist = call(stdvar.value task-store)
-		tasks = call(stdfu.filter tasklist matcher)
-		tasks
+	new-get-values = func(store-impl)
+		proc(matcher)
+			tasklist = call(stdvar.value store-impl)
+			tasks = call(stdfu.filter tasklist matcher)
+			tasks
+		end
 	end
 
 	# mock implementation for take-values
-	take-values = proc(matcher)
-		updator = func(tasks)
-			choose = func(remaining left-list taken-list)
-				if( empty(remaining)
-					list(left-list taken-list)
-					call(func()
-						next-task = head(remaining)
-						next-left next-taken = if( call(matcher next-task)
-							list(left-list append(taken-list next-task))
-							list(append(left-list next-task) taken-list)
-						):
-						call(choose rest(remaining) next-left next-taken)
-					end)
-				)
+	new-take-values = func(store-impl)
+		proc(matcher)
+			updator = func(tasks)
+				choose = func(remaining left-list taken-list)
+					if( empty(remaining)
+						list(left-list taken-list)
+						call(func()
+							next-task = head(remaining)
+							next-left next-taken = if( call(matcher next-task)
+								list(left-list append(taken-list next-task))
+								list(append(left-list next-task) taken-list)
+							):
+							call(choose rest(remaining) next-left next-taken)
+						end)
+					)
+				end
+
+				left taken = call(choose tasks list() list()):
+				list(left taken)
 			end
 
-			left taken = call(choose tasks list() list()):
-			list(left taken)
+			ok err _ takenlist = call(stdvar.change-v2 store-impl updator):
+			takenlist
 		end
-
-		ok err _ takenlist = call(stdvar.change-v2 task-store updator):
-		takenlist
 	end
 
 	# mock implementation for update
-	update = proc(matcher)
-		updator = func(tasks)
-			update-items = func(remaining newlist any-change)
-				if( empty(remaining)
-					list(newlist any-change)
-					call(func()
-						next-item = head(remaining)
-						do-update new-value = call(matcher next-item):
-						if( do-update
-							call(update-items rest(remaining) append(newlist new-value) true)
-							call(update-items rest(remaining) append(newlist next-item) any-change)
-						)
-					end)
-				)
+	new-update = func(store-impl)
+		proc(matcher)
+			updator = func(tasks)
+				update-items = func(remaining newlist any-change)
+					if( empty(remaining)
+						list(newlist any-change)
+						call(func()
+							next-item = head(remaining)
+							do-update new-value = call(matcher next-item):
+							if( do-update
+								call(update-items rest(remaining) append(newlist new-value) true)
+								call(update-items rest(remaining) append(newlist next-item) any-change)
+							)
+						end)
+					)
+				end
+
+				new-tasks is-any-change = call(update-items tasks list() false):
+				list(new-tasks is-any-change)
 			end
 
-			new-tasks is-any-change = call(update-items tasks list() false):
-			list(new-tasks is-any-change)
+			ok err _ is-any-change = call(stdvar.change-v2 store-impl updator):
+			is-any-change
 		end
-
-		ok err _ is-any-change = call(stdvar.change-v2 task-store updator):
-		is-any-change
 	end
 
 	# mock implementation for put-value
-	put-value = proc(item)
-		ok err _ = call(stdvar.change task-store func(prev) append(prev item) end):
-		list(ok err)
+	new-put-value = func(store-impl)
+		proc(item)
+			ok err _ = call(stdvar.change store-impl func(prev) append(prev item) end):
+			list(ok err)
+		end
+	end
+
+	trans = proc(txn-proc)
+		orig-value = call(stdvar.value task-store)
+		new-task-store = call(stdvar.new orig-value)
+		txn-object = map(
+			'get-values'  call(new-get-values new-task-store)
+			'take-values' call(new-take-values new-task-store)
+			'update'      call(new-update new-task-store)
+			'put-value'   call(new-put-value new-task-store)
+		)
+		do-commit = call(txn-proc txn-object)
+		_ = if( do-commit
+			call(stdvar.set task-store call(stdvar.value new-task-store))
+			'cancelled, changes not done'
+		)
+		do-commit
 	end
 
 	# return mock store-object
 	store-object = map(
-		'get-values'  get-values
-		'take-values' take-values
-		'update'      update
-		'put-value'   put-value
+		'get-values'  call(new-get-values task-store)
+		'take-values' call(new-take-values task-store)
+		'update'      call(new-update task-store)
+		'put-value'   call(new-put-value task-store)
+		'trans'       trans
 	)
 	store-object
 end
@@ -514,6 +541,143 @@ test-get-task-by-text-search = proc()
 	true
 end
 
+# --- test tasks import OK
+test-import-tasks-OK = proc()
+	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
+
+	tasks-importer = call(uc.new-tasks-importer store task-id-var)
+	task-adder = call(uc.new-task-adder store task-id-var)
+	task-getter = call(uc.new-task-getter store)
+
+	old-tasks = list(
+		map(
+			'name'  'Carwash'
+			'description' 'Washing car'
+		)
+		map(
+			'name'  'Garage'
+			'description' 'Clean the garage'
+		)
+		map(
+			'name'  'Shopping'
+			'description' 'Drive with car to do shopping'
+		)
+	)
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end old-tasks 'none')
+
+	tasks = list(
+		map(
+			'id'          1001
+			'name'        'task-A'
+			'description' 'text-A'
+			'tags'        list('tag-A')
+			'state'       'ongoing'
+			'version'     'v100'
+		)
+		map(
+			'id'          1002
+			'name'        'task-B'
+			'description' 'text-B'
+			'tags'        list('tag-B')
+			'state'       'new'
+			'version'     'v101'
+		)
+		map(
+			'id'          1003
+			'name'        'task-C'
+			'description' 'text-C'
+			'tags'        list('tag-C')
+			'state'       'done'
+			'version'     'v102'
+		)
+	)
+	imp-ok imp-err _ = call(tasks-importer map() tasks):
+	new-tasks = call(task-getter map('query-map' map()) map())
+
+	compa = func(val1 val2)
+		gt(
+			conv(slice(get(val1 'version') 1) 'int')
+			conv(slice(get(val2 'version') 1) 'int')
+		)
+	end
+
+	tsk1 = call(stdsort.sort call(stdfu.apply tasks func(item) del(item 'id') end) compa)
+	tsk2 = call(stdsort.sort call(stdfu.apply new-tasks func(item) del(item 'id') end) compa)
+	_ = call(stddbc.assert eq(tsk1 tsk2) sprintf('differing: %v \n %v' tsk1 tsk2))
+	true
+end
+
+# --- test tasks import fail (tasks should stay as those were in store)
+test-import-tasks-fail = proc()
+	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
+
+	tasks-importer = call(uc.new-tasks-importer store task-id-var)
+	task-adder = call(uc.new-task-adder store task-id-var)
+	task-getter = call(uc.new-task-getter store)
+
+	old-tasks = list(
+		map(
+			'name'  'Carwash'
+			'description' 'Washing car'
+		)
+		map(
+			'name'  'Garage'
+			'description' 'Clean the garage'
+		)
+		map(
+			'name'  'Shopping'
+			'description' 'Drive with car to do shopping'
+		)
+	)
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end old-tasks 'none')
+
+	# read previous tasks
+	previous-tasks = call(task-getter map('query-map' map()) map())
+
+	tasks = list(
+		map(
+			'id'          1001
+			'name'        'task-A'
+			'description' 'text-A'
+			'tags'        list('tag-A')
+			'state'       'ongoing'
+			'version'     'v100'
+		)
+		map(
+			'id'          1002
+			'name'        'task-B'
+			'description' 'text-B'
+			'tags'        list('tag-B')
+			'state'       'THIS VALUE IS INVALID'
+			'version'     'v101'
+		)
+		map(
+			'id'          1003
+			'name'        'task-C'
+			'description' 'text-C'
+			'tags'        list('tag-C')
+			'state'       'done'
+			'version'     'v102'
+		)
+	)
+	imp-ok imp-err _ = call(tasks-importer map() tasks):
+	new-tasks = call(task-getter map('query-map' map()) map())
+
+	compa = func(val1 val2)
+		gt(
+			conv(slice(get(val1 'version') 1) 'int')
+			conv(slice(get(val2 'version') 1) 'int')
+		)
+	end
+
+	tsk1 = call(stdsort.sort call(stdfu.apply previous-tasks func(item) del(item 'id') end) compa)
+	tsk2 = call(stdsort.sort call(stdfu.apply new-tasks func(item) del(item 'id') end) compa)
+	_ = call(stddbc.assert eq(tsk1 tsk2) sprintf('differing: %v \n %v' tsk1 tsk2))
+	true
+end
+
 main = proc()
 	tests-uc = list(
 		test-add-task-ok
@@ -533,6 +697,9 @@ main = proc()
 		test-get-task-by-query
 
 		test-get-task-by-text-search
+
+		test-import-tasks-OK
+		test-import-tasks-fail
 	)
 	tests = extend(tests-uc call(domain.get-testcases))
 

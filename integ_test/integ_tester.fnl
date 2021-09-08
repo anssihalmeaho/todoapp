@@ -106,6 +106,65 @@ modify-task = proc(task-id new-data)
 	call(check-response-ok response 200)
 end
 
+import-tasks = proc(tasks)
+	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/import/tasks' port-number)
+	header = map('Content-Type' 'application/json')
+
+	ok err body = call(stdjson.encode tasks):
+
+	_ = call(verify ok err)
+	response = call(stdhttp.do 'POST' server-endpoint header body)
+	call(check-response-ok response 201)
+end
+
+importing-tasks = proc()
+	new-tasks = list(
+		map(
+			'id'          1001
+			'name'        'task-A'
+			'description' 'text-A'
+			'tags'        list('tag-A')
+			'state'       'ongoing'
+			'version'     'v100'
+		)
+		map(
+			'id'          1002
+			'name'        'task-B'
+			'description' 'text-B'
+			'tags'        list('tag-B')
+			'state'       'new'
+			'version'     'v101'
+		)
+		map(
+			'id'          1003
+			'name'        'task-C'
+			'description' 'text-C'
+			'tags'        list('tag-C')
+			'state'       'done'
+			'version'     'v102'
+		)
+	)
+
+	# Read original tasks first
+	original-tasks = call(get-tasks)
+
+	# Import some new tasks
+	_ = call(verify call(import-tasks new-tasks) 'import failed')
+	new-ones = call(get-tasks)
+	_ = call(verify eq(len(new-ones) len(new-tasks)) 'invalid length')
+	new-names = call(stdfu.apply new-tasks func(x) get(x 'name') end)
+	_ = call(verify in(new-names get(head(new-ones) 'name')) sprintf('invalid name: %v \n %v \n' new-names new-ones))
+
+	# Import original tasks
+	_ = call(verify call(import-tasks original-tasks) 'import failed')
+	orig-ones = call(get-tasks)
+	_ = call(verify eq(len(orig-ones) len(original-tasks)) 'invalid length')
+	orig-names = call(stdfu.apply original-tasks func(x) get(x 'name') end)
+	_ = call(verify in(orig-names get(head(orig-ones) 'name')) sprintf('invalid name: %v \n %v \n' new-names new-ones))
+
+	'ok'
+end
+
 replace-task = proc(task-id new-data)
 	server-endpoint = sprintf('http://localhost:%s/todoapp/v1/tasks/%d' port-number task-id)
 	header = map('Content-Type' 'application/json')
@@ -169,6 +228,9 @@ do-testing = proc()
 	_ = call(verify eq(get(b-task-2 'description') 'text-replaced') 'invalid task data')
 	_ = call(verify eq(get(b-task-2 'tags') list('new-tag')) 'invalid task data')
 	_ = call(verify eq(get(b-task-2 'state') 'done') 'invalid task data')
+
+	# Test some tasks importing
+	_ = call(importing-tasks)
 
 	'OK'
 end
