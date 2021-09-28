@@ -38,6 +38,15 @@ get-query-names = func()
 	call(domain.get-query-names)
 end
 
+new-tag-getter = proc(store)
+	get-values = get(store 'get-values')
+
+	proc(req msg)
+		all-tasks = call(get-values func(item) true end)
+		call(domain.get-all-tags all-tasks)
+	end
+end
+
 new-task-getter = proc(store)
 	get-values = get(store 'get-values')
 

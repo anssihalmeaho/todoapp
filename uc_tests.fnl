@@ -541,6 +541,44 @@ test-get-task-by-text-search = proc()
 	true
 end
 
+# --- test getting all tags
+test-get-tags-OK = proc()
+	store = call(new-simulated-store)
+	task-id-var = call(stdvar.new 100)
+
+	task-adder = call(uc.new-task-adder store task-id-var)
+	tag-getter = call(uc.new-tag-getter store)
+
+	tasks = list(
+		map(
+			'name'  'task-A'
+			'state' 'new'
+			'tags'  list('A1-tag' 'A2-tag' 'common')
+		)
+		map(
+			'name'  'task-B'
+			'state' 'ongoing'
+		)
+		map(
+			'name'  'task-C'
+			'state' 'done'
+			'tags'  list('C1-tag' 'C2-tag' 'common')
+		)
+	)
+	_ = call(stdfu.ploop proc(task _) call(task-adder map() task) end tasks 'none')
+
+	taglist = call(tag-getter map() map())
+	_ = call(stddbc.assert eq(len(taglist) 5) sprintf('unexpected tags: %v' taglist))
+
+	_ = call(stddbc.assert in(taglist 'A1-tag') sprintf('unexpected tags: %v' taglist))
+	_ = call(stddbc.assert in(taglist 'A2-tag') sprintf('unexpected tags: %v' taglist))
+	_ = call(stddbc.assert in(taglist 'C1-tag') sprintf('unexpected tags: %v' taglist))
+	_ = call(stddbc.assert in(taglist 'C2-tag') sprintf('unexpected tags: %v' taglist))
+	_ = call(stddbc.assert in(taglist 'common') sprintf('unexpected tags: %v' taglist))
+
+	true
+end
+
 # --- test tasks import OK
 test-import-tasks-OK = proc()
 	store = call(new-simulated-store)
@@ -700,6 +738,8 @@ main = proc()
 
 		test-import-tasks-OK
 		test-import-tasks-fail
+
+		test-get-tags-OK
 	)
 	tests = extend(tests-uc call(domain.get-testcases))
 

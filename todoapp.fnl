@@ -81,6 +81,11 @@ main = proc()
 					list('todoapp' 'v1' 'tasks')
 					call(http.create-middle call(http.create-items-reader call(uc.new-task-getter store) uc.get-query-names))
 				)
+
+				list(
+					list('todoapp' 'v1' 'tags')
+					call(http.create-middle call(http.create-items-reader call(uc.new-tag-getter store) uc.get-query-names))
+				)
 			)
 
 		'POST' list(

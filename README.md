@@ -393,6 +393,22 @@ curl http://localhost:8003/todoapp/v1/tasks?search=car,lawn
 ]
 ```
 
+### Reading tags: GET /todoapp/v1/tags
+
+Reading tags (all tags in tasks with distinct values).
+HTTP status code in response is 200.
+
+Example: Get tags
+
+```
+curl http://localhost:8003/todoapp/v1/tags
+
+[
+    "car",
+    "home",
+    "yard"
+]
+```
 
 ## Port number
 

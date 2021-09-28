@@ -56,6 +56,15 @@ get-query-names = func()
 	list('name' 'tags' 'state' 'search')
 end
 
+get-all-tags = func(tasks)
+	import stdfu
+	import stdset
+
+	taglist = call(stdfu.loop func(task tags) extend(tags get(task 'tags')) end tasks list())
+	tagset = call(stdset.list-to-set call(stdset.newset) taglist)
+	call(stdset.as-list tagset)
+end
+
 get-query-func = func(query-map)
 	import stdfu
 
