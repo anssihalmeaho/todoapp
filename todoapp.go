@@ -27,20 +27,20 @@ var er string
 //go:embed imported/httprouter.fnl
 var httprouter string
 
-func addOwnModules() (err error) {
-	if err = funl.AddFunModToNamespace("httprouter", []byte(httprouter)); err != nil {
+func addOwnModules(interpreter *funl.Interpreter) (err error) {
+	if err = funl.AddFunModToNamespace("httprouter", []byte(httprouter), interpreter); err != nil {
 		return
 	}
-	if err = funl.AddFunModToNamespace("domain", []byte(domain)); err != nil {
+	if err = funl.AddFunModToNamespace("domain", []byte(domain), interpreter); err != nil {
 		return
 	}
-	if err = funl.AddFunModToNamespace("er", []byte(er)); err != nil {
+	if err = funl.AddFunModToNamespace("er", []byte(er), interpreter); err != nil {
 		return
 	}
-	if err = funl.AddFunModToNamespace("uc", []byte(uc)); err != nil {
+	if err = funl.AddFunModToNamespace("uc", []byte(uc), interpreter); err != nil {
 		return
 	}
-	if err = funl.AddFunModToNamespace("http", []byte(http)); err != nil {
+	if err = funl.AddFunModToNamespace("http", []byte(http), interpreter); err != nil {
 		return
 	}
 	return nil
@@ -57,7 +57,7 @@ func convGetter(inGetter func(string) fuvaluez.FZProc) func(string) std.StdFuncT
 	}
 }
 
-func initMyExt() (err error) {
+func initMyExt(interpreter *funl.Interpreter) (err error) {
 	stdModuleName := "valuez"
 	topFrame := &funl.Frame{
 		Syms:     funl.NewSymt(),
@@ -114,7 +114,7 @@ func initMyExt() (err error) {
 			Getter: convGetter(fuvaluez.GetVZClose),
 		},
 	}
-	err = std.SetSTDFunctions(topFrame, stdModuleName, stdFuncs)
+	err = std.SetSTDFunctions(topFrame, stdModuleName, stdFuncs, interpreter)
 	return
 }
 
