@@ -59,11 +59,7 @@ func convGetter(inGetter func(string) fuvaluez.FZProc) func(string) std.StdFuncT
 
 func initMyExt(interpreter *funl.Interpreter) (err error) {
 	stdModuleName := "valuez"
-	topFrame := &funl.Frame{
-		Syms:     funl.NewSymt(),
-		OtherNS:  make(map[funl.SymID]funl.ImportInfo),
-		Imported: make(map[funl.SymID]*funl.Frame),
-	}
+	topFrame := funl.NewTopFrameWithInterpreter(interpreter)
 	stdFuncs := []std.StdFuncInfo{
 		{
 			Name:   "open",
